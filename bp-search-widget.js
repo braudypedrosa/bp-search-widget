@@ -38,6 +38,7 @@ class BPSearchWidget {
     this.boundHandleContainerKeydown = this.handleContainerKeydown.bind(this);
     this.boundHandleDocumentClick = this.handleDocumentClick.bind(this);
     this.boundHandleDocumentKeydown = this.handleDocumentKeydown.bind(this);
+    this.boundHandleFilterLayoutScroll = this.handleFilterLayoutScroll.bind(this);
     this.lockedBodyOverflow = '';
 
     this.state = {
@@ -148,6 +149,7 @@ class BPSearchWidget {
     const position = ALLOWED_POSITIONS.has(field.position) ? field.position : 'end';
 
     normalized.position = position;
+    normalized.icon = this.normalizeFieldIcon(field.icon);
     normalized.options = CHOICE_FIELD_TYPES.has(normalized.type)
       ? this.normalizeFieldOptions(normalized.label, field.options)
       : [];
@@ -160,6 +162,10 @@ class BPSearchWidget {
 
     if (filter.position !== undefined) {
       throw new Error(`Filter ${normalized.label} does not support position`);
+    }
+
+    if (filter.icon !== undefined) {
+      throw new Error('icon is only supported on fields');
     }
 
     normalized.width = this.normalizeWidth(filter.width);
@@ -244,6 +250,18 @@ class BPSearchWidget {
         value: optionValue,
       };
     });
+  }
+
+  normalizeFieldIcon(icon) {
+    if (icon === undefined || icon === null) {
+      return null;
+    }
+
+    if (typeof icon !== 'string') {
+      throw new Error('Field icon must be a non-empty string');
+    }
+
+    return icon.trim() ? icon.trim() : null;
   }
 
   normalizeWidth(width) {
@@ -549,6 +567,7 @@ class BPSearchWidget {
     const content = this.createFieldContent();
     const label = this.createFieldLabel(field.label);
     const input = this.createElement('input', 'bp-search-widget__input');
+    const icon = field.icon ? this.createIconWrapper(this.getCustomFieldIcon(field.icon)) : null;
 
     input.type = 'text';
     input.placeholder = field.label;
@@ -558,6 +577,10 @@ class BPSearchWidget {
 
     content.appendChild(label);
     content.appendChild(input);
+    if (icon) {
+      section.classList.add('bp-search-widget__section--has-icon');
+      section.appendChild(icon);
+    }
     section.appendChild(content);
     section.setAttribute('data-field-key', field.key);
 
@@ -583,11 +606,16 @@ class BPSearchWidget {
     if (collection === 'fields') {
       const content = this.createFieldContent();
       const label = this.createFieldLabel(field.label);
+      const icon = field.icon ? this.createIconWrapper(this.getCustomFieldIcon(field.icon)) : null;
 
       content.appendChild(label);
       trigger.appendChild(triggerValue);
       trigger.appendChild(triggerChevron);
       content.appendChild(trigger);
+      if (icon) {
+        section.classList.add('bp-search-widget__section--has-icon');
+        section.appendChild(icon);
+      }
       section.appendChild(content);
       section.setAttribute('data-field-key', field.key);
       section.classList.add('bp-search-widget__section--choice');
@@ -603,11 +631,17 @@ class BPSearchWidget {
 
   renderFilterButton() {
     const button = this.createElement('button', 'bp-search-widget__icon-button bp-search-widget__icon-button--filter');
+    const activeFilterCount = this.getActiveFilterCount();
     button.type = 'button';
     button.setAttribute('data-action', 'filter');
-    button.setAttribute('aria-label', 'Open filters');
+    button.setAttribute('aria-label', this.getFilterButtonLabel(activeFilterCount));
     button.setAttribute('aria-expanded', String(this.isFilterPanelOpen));
     button.innerHTML = this.getFilterIcon();
+    if (activeFilterCount > 0) {
+      const badge = this.createElement('span', 'bp-search-widget__filter-badge', String(activeFilterCount));
+      badge.setAttribute('data-role', 'filter-badge');
+      button.appendChild(badge);
+    }
     this.elements.filterButton = button;
     return button;
   }
@@ -634,6 +668,9 @@ class BPSearchWidget {
     const title = this.createElement('h2', 'bp-search-widget__filter-title', 'Filters');
     const closeButton = this.createElement('button', 'bp-search-widget__filter-close');
     const layout = this.createElement('div', 'bp-search-widget__filter-layout');
+    const footer = this.createElement('div', 'bp-search-widget__filter-footer');
+    const resetButton = this.createElement('button', 'bp-search-widget__filter-reset', 'Reset');
+    const applyButton = this.createElement('button', 'bp-search-widget__filter-apply', 'Apply');
     const rows = this.getFilterRows();
 
     panel.setAttribute('data-role', 'filter-panel');
@@ -645,12 +682,20 @@ class BPSearchWidget {
     dialog.setAttribute('role', 'dialog');
     dialog.setAttribute('aria-modal', 'true');
     dialog.setAttribute('aria-label', 'Filters');
+    layout.setAttribute('data-role', 'filter-layout');
     closeButton.type = 'button';
     closeButton.setAttribute('data-action', 'close-filter-panel');
     closeButton.setAttribute('aria-label', 'Close filters');
     closeButton.innerHTML = this.getCloseIcon();
+    resetButton.type = 'button';
+    resetButton.setAttribute('data-action', 'reset-filters');
+    applyButton.type = 'button';
+    applyButton.setAttribute('data-action', 'apply-filters');
+    layout.addEventListener('scroll', this.boundHandleFilterLayoutScroll);
     header.appendChild(title);
     header.appendChild(closeButton);
+    footer.appendChild(resetButton);
+    footer.appendChild(applyButton);
 
     rows.forEach((row) => {
       const rowElement = this.createElement('div', 'bp-search-widget__filter-row');
@@ -665,8 +710,13 @@ class BPSearchWidget {
 
     dialog.appendChild(header);
     dialog.appendChild(layout);
+    dialog.appendChild(footer);
     panel.appendChild(backdrop);
     panel.appendChild(dialog);
+    this.elements.filterDialog = dialog;
+    this.elements.filterLayout = layout;
+    this.elements.filterResetButton = resetButton;
+    this.elements.filterApplyButton = applyButton;
     this.elements.filterCloseButton = closeButton;
     return panel;
   }
@@ -914,8 +964,15 @@ class BPSearchWidget {
     }
 
     if (this.openPopover) {
-      const owner = this.getChoiceOwnerElement(this.openPopover.collection, this.openPopover.key);
-      if (owner && !owner.contains(target)) {
+      const owner = this.openPopover.owner
+        || this.getChoiceOwnerElement(this.openPopover.collection, this.openPopover.key);
+      const popover = this.openPopover.popover || null;
+
+      if (
+        owner
+        && !owner.contains(target)
+        && (!popover || !popover.contains(target))
+      ) {
         this.closeChoicePopover();
       }
     }
@@ -940,6 +997,18 @@ class BPSearchWidget {
     const closeFilterPanelButton = target.closest('[data-action="close-filter-panel"]');
     if (closeFilterPanelButton) {
       this.closeFilterPanel();
+      return;
+    }
+
+    const applyFiltersButton = target.closest('[data-action="apply-filters"]');
+    if (applyFiltersButton) {
+      this.closeFilterPanel();
+      return;
+    }
+
+    const resetFiltersButton = target.closest('[data-action="reset-filters"]');
+    if (resetFiltersButton) {
+      this.resetFilters();
       return;
     }
 
@@ -1101,6 +1170,12 @@ class BPSearchWidget {
     this.closeFilterPanel();
   }
 
+  handleFilterLayoutScroll() {
+    if (this.openPopover && this.openPopover.collection === 'filters') {
+      this.closeChoicePopover();
+    }
+  }
+
   handleDocumentKeydown(event) {
     if (event.key === 'Escape') {
       this.closeChoicePopover();
@@ -1161,13 +1236,22 @@ class BPSearchWidget {
     const trigger = owner.querySelector('[data-action="toggle-popover"]');
     const popover = this.createChoicePopover(field, collection);
 
-    owner.appendChild(popover);
+    if (collection === 'filters') {
+      this.openFloatingFilterPopover(owner, popover);
+    } else {
+      owner.appendChild(popover);
+    }
     owner.classList.add('is-open');
     if (trigger) {
       trigger.setAttribute('aria-expanded', 'true');
     }
 
-    this.openPopover = { key, collection };
+    this.openPopover = {
+      key,
+      collection,
+      owner,
+      popover,
+    };
   }
 
   closeChoicePopover() {
@@ -1175,9 +1259,10 @@ class BPSearchWidget {
       return;
     }
 
-    const owner = this.getChoiceOwnerElement(this.openPopover.collection, this.openPopover.key);
+    const owner = this.openPopover.owner
+      || this.getChoiceOwnerElement(this.openPopover.collection, this.openPopover.key);
     if (owner) {
-      const popover = owner.querySelector('.bp-search-widget__popover');
+      const popover = this.openPopover.popover || owner.querySelector('.bp-search-widget__popover');
       const trigger = owner.querySelector('[data-action="toggle-popover"]');
 
       if (popover) {
@@ -1192,6 +1277,53 @@ class BPSearchWidget {
     }
 
     this.openPopover = null;
+  }
+
+  openFloatingFilterPopover(owner, popover) {
+    const dialog = this.elements.filterDialog;
+    if (!dialog) {
+      owner.appendChild(popover);
+      return;
+    }
+    popover.classList.add('bp-search-widget__popover--floating');
+    dialog.appendChild(popover);
+    this.positionFloatingFilterPopover(owner, popover, dialog);
+  }
+
+  positionFloatingFilterPopover(owner, popover, dialog = this.elements.filterDialog) {
+    if (!dialog) {
+      return;
+    }
+
+    const gap = 8;
+    const viewportPadding = 16;
+    const viewportHeight = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+    const ownerRect = owner.getBoundingClientRect();
+    const dialogRect = dialog.getBoundingClientRect();
+
+    popover.style.left = `${Math.round(ownerRect.left - dialogRect.left)}px`;
+    popover.style.width = `${Math.round(ownerRect.width)}px`;
+    popover.style.top = '0px';
+    popover.style.maxHeight = '';
+
+    const popoverHeight = popover.getBoundingClientRect().height;
+    const availableBelow = Math.max(0, viewportHeight - ownerRect.bottom - viewportPadding);
+    const availableAbove = Math.max(0, ownerRect.top - viewportPadding);
+    const shouldOpenAbove = popoverHeight > availableBelow && availableAbove > availableBelow;
+    const availableSpace = shouldOpenAbove ? availableAbove : availableBelow;
+    const maxHeight = Math.max(0, Math.floor(availableSpace));
+
+    if (maxHeight > 0) {
+      popover.style.maxHeight = `${maxHeight}px`;
+    }
+
+    const visiblePopoverHeight = popover.getBoundingClientRect().height;
+    const popoverTop = shouldOpenAbove
+      ? ownerRect.top - dialogRect.top - visiblePopoverHeight - gap
+      : ownerRect.bottom - dialogRect.top + gap;
+
+    popover.style.top = `${Math.round(Math.max(0, popoverTop))}px`;
+    popover.classList.toggle('bp-search-widget__popover--above', shouldOpenAbove);
   }
 
   openFilterPanel() {
@@ -1229,6 +1361,11 @@ class BPSearchWidget {
       this.elements.filterPanel = null;
     }
 
+    this.elements.filterDialog = null;
+    this.elements.filterLayout = null;
+    this.elements.filterResetButton = null;
+    this.elements.filterApplyButton = null;
+    this.elements.filterCloseButton = null;
     this.isFilterPanelOpen = false;
     this.unlockBodyScroll();
 
@@ -1323,7 +1460,12 @@ class BPSearchWidget {
 
       const existingPopover = owner.querySelector('.bp-search-widget__popover');
       if (existingPopover) {
-        existingPopover.replaceWith(this.createChoicePopover(field, collection));
+        const nextPopover = this.createChoicePopover(field, collection);
+        existingPopover.replaceWith(nextPopover);
+
+        if (this.openPopover && this.openPopover.collection === collection && this.openPopover.key === key) {
+          this.openPopover.popover = nextPopover;
+        }
       }
     }
   }
@@ -1390,6 +1532,11 @@ class BPSearchWidget {
     this.syncSearchDisabledState();
   }
 
+  resetFilters() {
+    this.state.filters = this.buildFilterState(this.options.filters, {});
+    this.render();
+  }
+
   updateCounterDisplay(key) {
     const filter = this.getFilterByKey(key);
     const card = this.getFilterCardElement(key);
@@ -1429,6 +1576,36 @@ class BPSearchWidget {
     if (this.elements.searchButton) {
       this.elements.searchButton.disabled = !this.canSubmitSearch();
     }
+
+    this.syncFilterButtonState();
+  }
+
+  syncFilterButtonState() {
+    if (!this.elements.filterButton) {
+      return;
+    }
+
+    const activeFilterCount = this.getActiveFilterCount();
+    const button = this.elements.filterButton;
+    const existingBadge = button.querySelector('[data-role="filter-badge"]');
+
+    button.setAttribute('aria-label', this.getFilterButtonLabel(activeFilterCount));
+
+    if (activeFilterCount <= 0) {
+      if (existingBadge) {
+        existingBadge.remove();
+      }
+      return;
+    }
+
+    if (existingBadge) {
+      existingBadge.textContent = String(activeFilterCount);
+      return;
+    }
+
+    const badge = this.createElement('span', 'bp-search-widget__filter-badge', String(activeFilterCount));
+    badge.setAttribute('data-role', 'filter-badge');
+    button.appendChild(badge);
   }
 
   hasValidDateRange() {
@@ -1469,6 +1646,20 @@ class BPSearchWidget {
     }
 
     return typeof value === 'string' && value.trim() !== '';
+  }
+
+  isFilterActive(field, value) {
+    if (field.type === 'counter') {
+      return Number.isFinite(value) && value !== field.defaultValue;
+    }
+
+    return this.fieldHasValue(field, value);
+  }
+
+  getActiveFilterCount() {
+    return this.options.filters.reduce((count, field) => (
+      this.isFilterActive(field, this.state.filters[field.key]) ? count + 1 : count
+    ), 0);
   }
 
   canSubmitSearch() {
@@ -1672,8 +1863,20 @@ class BPSearchWidget {
     return this.getFaIconMarkup('fa-solid fa-sliders');
   }
 
+  getFilterButtonLabel(activeFilterCount) {
+    if (activeFilterCount <= 0) {
+      return 'Open filters';
+    }
+
+    return `Open filters, ${activeFilterCount} active`;
+  }
+
   getSearchIcon() {
     return this.getFaIconMarkup('fa-solid fa-magnifying-glass');
+  }
+
+  getCustomFieldIcon(className) {
+    return this.getFaIconMarkup(className);
   }
 
   getChevronIcon() {

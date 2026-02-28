@@ -116,8 +116,8 @@
 
       const widget = new BPSearchWidget('#widget-demo', {
         fields: [
-          { label: 'Guests', type: 'select', options: ['1', '2', '3', '4+'], position: 'end' },
-          { label: 'Promo Code', type: 'input', position: 'start' },
+          { label: 'Guests', type: 'select', options: ['1', '2', '3', '4+'], position: 'end', icon: 'fa-solid fa-users' },
+          { label: 'Promo Code', type: 'input', position: 'start', icon: 'fa-solid fa-ticket' },
         ],
         filters: [
           { label: 'Bedrooms', type: 'counter', min: 1, max: 8, defaultValue: 2, width: '30%' },
@@ -125,6 +125,7 @@
           { label: 'Amenities', type: 'checkbox', options: ['Pool', 'Spa', 'Gym'] },
           { label: 'Property Type', type: 'radio', options: ['Villa', 'Cabin', 'Suite'] },
           { label: 'Pets', type: 'checkbox', options: ['Dog', 'Cat'], width: '50%' },
+          { label: 'Budget', type: 'select', options: ['Under $200', '$200-$500', '$500+'] },
           { label: 'Keyword', type: 'input' },
         ],
         calendarOptions: {

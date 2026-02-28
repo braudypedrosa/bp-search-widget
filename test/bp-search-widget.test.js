@@ -31,6 +31,22 @@ function openFilters() {
   return document.querySelector('[data-role="filter-panel"]');
 }
 
+function createRect({ top, left, width, height }) {
+  return {
+    top,
+    left,
+    width,
+    height,
+    right: left + width,
+    bottom: top + height,
+    x: left,
+    y: top,
+    toJSON() {
+      return this;
+    },
+  };
+}
+
 afterEach(() => {
   document.body.innerHTML = '';
 });
@@ -96,6 +112,10 @@ describe('BPSearchWidget', () => {
     })).toThrow(/does not support position/);
 
     expect(() => createWidget({
+      filters: [{ label: 'View', type: 'select', options: ['Ocean'], icon: 'fa-solid fa-eye' }],
+    })).toThrow(/icon is only supported on fields/);
+
+    expect(() => createWidget({
       fields: [{ label: 'Guests', type: 'input', key: 'bp-shared' }],
       filters: [{ label: 'Adults', type: 'counter', key: 'bp-shared' }],
     })).toThrow(/Duplicate key across fields and filters/);
@@ -124,6 +144,20 @@ describe('BPSearchWidget', () => {
       .map((element) => element.textContent);
 
     expect(labels).toEqual(['Promo Code', 'Campaign', 'Guests', 'Pets']);
+    widget.destroy();
+  });
+
+  it('renders custom field icons for inline fields only', () => {
+    const widget = createWidget({
+      fields: [
+        { label: 'Promo Code', type: 'input', position: 'start', icon: 'fa-solid fa-ticket' },
+        { label: 'Guests', type: 'select', options: ['1', '2'], icon: 'fa-solid fa-users' },
+      ],
+    });
+
+    expect(document.querySelector('[data-field-key="bp-promo-code"] .bp-search-widget__icon .fa-ticket')).not.toBeNull();
+    expect(document.querySelector('[data-field-key="bp-guests"] .bp-search-widget__icon .fa-users')).not.toBeNull();
+
     widget.destroy();
   });
 
@@ -382,6 +416,97 @@ describe('BPSearchWidget', () => {
     widget.destroy();
   });
 
+  it('closes the filter modal when Apply is clicked without changing submit validation', () => {
+    const widget = createWidget({
+      filters: [{ label: 'Keyword', type: 'input', required: true }],
+    });
+
+    selectDateRange(widget);
+    expect(document.querySelector('[data-action="search"]').disabled).toBe(true);
+
+    openFilters();
+    expect(document.querySelector('[data-role="filter-panel"]')).not.toBeNull();
+
+    document.querySelector('[data-action="apply-filters"]').click();
+    expect(document.querySelector('[data-role="filter-panel"]')).toBeNull();
+    expect(document.querySelector('[data-action="search"]').disabled).toBe(true);
+
+    widget.destroy();
+  });
+
+  it('resets filter values, keeps the modal open, and clears validation state', () => {
+    const widget = createWidget({
+      filters: [
+        { label: 'Keyword', type: 'input', required: true },
+        { label: 'Budget', type: 'select', options: ['Under $200', '$200-$500'] },
+        { label: 'Amenities', type: 'checkbox', options: ['Pool', 'Spa'] },
+        { label: 'Bedrooms', type: 'counter', min: 1, max: 8, defaultValue: 2 },
+      ],
+    });
+
+    selectDateRange(widget);
+    openFilters();
+
+    const keywordInput = document.querySelector('[data-role="filter-input"]');
+    keywordInput.value = 'oceanfront';
+    keywordInput.dispatchEvent(new Event('input', { bubbles: true }));
+
+    document.querySelector('[data-key="bp-budget"]').click();
+    document.querySelector('[data-action="select-option"][data-key="bp-budget"][data-value="Under $200"]').click();
+    document.querySelector('[data-action="toggle-filter-checkbox"][data-key="bp-amenities"][data-value="Pool"]').click();
+    document.querySelector('[data-action="increment-filter-counter"]').click();
+
+    expect(document.querySelector('[data-action="search"]').disabled).toBe(false);
+    expect(document.querySelector('[data-role="filter-badge"]').textContent).toBe('4');
+
+    document.querySelector('[data-action="reset-filters"]').click();
+
+    expect(document.querySelector('[data-role="filter-panel"]')).not.toBeNull();
+    expect(document.querySelector('[data-role="filter-input"]').value).toBe('');
+    expect(document.querySelector('[data-filter-key="bp-budget"] .bp-search-widget__trigger-value').textContent).toBe('Select Budget');
+    expect(document.querySelectorAll('.bp-search-widget__filter-choice.is-selected')).toHaveLength(0);
+    expect(document.querySelector('[data-role="filter-counter-input"]').value).toBe('2');
+    expect(document.querySelector('[data-action="search"]').disabled).toBe(true);
+    expect(document.querySelector('[data-role="filter-badge"]')).toBeNull();
+
+    widget.destroy();
+  });
+
+  it('shows an active-filter badge count on the filter button', () => {
+    const widget = createWidget({
+      filters: [
+        { label: 'Bedrooms', type: 'counter', min: 1, max: 8, defaultValue: 2 },
+        { label: 'Budget', type: 'select', options: ['Under $200', '$200-$500'] },
+        { label: 'Amenities', type: 'checkbox', options: ['Pool', 'Spa'] },
+        { label: 'Keyword', type: 'input' },
+      ],
+    });
+
+    expect(document.querySelector('[data-role="filter-badge"]')).toBeNull();
+
+    openFilters();
+    document.querySelector('[data-key="bp-budget"]').click();
+    document.querySelector('[data-action="select-option"][data-key="bp-budget"][data-value="Under $200"]').click();
+    expect(document.querySelector('[data-role="filter-badge"]').textContent).toBe('1');
+
+    document.querySelector('[data-action="toggle-filter-checkbox"][data-key="bp-amenities"][data-value="Pool"]').click();
+    expect(document.querySelector('[data-role="filter-badge"]').textContent).toBe('2');
+
+    const keywordInput = document.querySelector('[data-role="filter-input"]');
+    keywordInput.value = 'oceanfront';
+    keywordInput.dispatchEvent(new Event('input', { bubbles: true }));
+    expect(document.querySelector('[data-role="filter-badge"]').textContent).toBe('3');
+
+    document.querySelector('[data-action="increment-filter-counter"]').click();
+    expect(document.querySelector('[data-role="filter-badge"]').textContent).toBe('4');
+
+    document.querySelector('[data-action="apply-filters"]').click();
+    expect(document.querySelector('[data-role="filter-panel"]')).toBeNull();
+    expect(document.querySelector('[data-role="filter-badge"]').textContent).toBe('4');
+
+    widget.destroy();
+  });
+
   it('opens choice popovers, closes single-choice pickers, and keeps checkbox popovers open', () => {
     const widget = createWidget({
       fields: [
@@ -420,13 +545,68 @@ describe('BPSearchWidget', () => {
     openFilters();
     document.querySelector('[data-key="bp-view"]').click();
     expect(document.querySelector('.bp-search-widget__popover')).not.toBeNull();
-    expect(document.querySelector('[data-filter-popover-key="bp-view"] .bp-search-widget__popover')).not.toBeNull();
+    expect(document.querySelector('[data-role="filter-dialog"] > .bp-search-widget__popover--floating')).not.toBeNull();
+    expect(document.querySelector('[data-filter-popover-key="bp-view"] .bp-search-widget__popover')).toBeNull();
 
     document.querySelector('[data-action="select-option"][data-key="bp-view"][data-value="Garden"]').click();
 
     expect(document.querySelector('.bp-search-widget__popover')).toBeNull();
     expect(document.querySelector('[data-filter-key="bp-view"] .bp-search-widget__trigger-value').textContent).toBe('Garden');
 
+    widget.destroy();
+  });
+
+  it('closes floating filter select popovers when the modal body scrolls', () => {
+    const widget = createWidget({
+      filters: [
+        { label: 'View', type: 'select', options: ['Ocean', 'Garden'] },
+        { label: 'Budget', type: 'select', options: ['Under $200', '$200-$500'] },
+      ],
+    });
+
+    openFilters();
+    document.querySelector('[data-key="bp-budget"]').click();
+    expect(document.querySelector('.bp-search-widget__popover--floating')).not.toBeNull();
+
+    document.querySelector('[data-role="filter-layout"]').dispatchEvent(new Event('scroll'));
+    expect(document.querySelector('.bp-search-widget__popover')).toBeNull();
+
+    widget.destroy();
+  });
+
+  it('opens floating filter select popovers upward when there is not enough room below', () => {
+    const widget = createWidget({
+      filters: [{ label: 'Budget', type: 'select', options: ['Under $200', '$200-$500', '$500+'] }],
+    });
+    const originalGetBoundingClientRect = HTMLElement.prototype.getBoundingClientRect;
+    const rectSpy = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function mockRect() {
+      if (this.matches?.('[data-role="filter-dialog"]')) {
+        return createRect({ top: 40, left: 0, width: 360, height: 600 });
+      }
+
+      if (this.matches?.('[data-filter-popover-key="bp-budget"]')) {
+        return createRect({ top: 520, left: 24, width: 280, height: 52 });
+      }
+
+      if (this.classList?.contains('bp-search-widget__popover')) {
+        return createRect({ top: 0, left: 0, width: 280, height: 180 });
+      }
+
+      return originalGetBoundingClientRect.call(this);
+    });
+    const innerHeightSpy = vi.spyOn(window, 'innerHeight', 'get').mockReturnValue(640);
+
+    openFilters();
+    document.querySelector('[data-key="bp-budget"]').click();
+
+    const popover = document.querySelector('.bp-search-widget__popover--floating');
+
+    expect(popover).not.toBeNull();
+    expect(popover.classList.contains('bp-search-widget__popover--above')).toBe(true);
+    expect(Number.parseInt(popover.style.top, 10)).toBe(292);
+
+    innerHeightSpy.mockRestore();
+    rectSpy.mockRestore();
     widget.destroy();
   });
 

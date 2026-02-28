@@ -8,8 +8,11 @@ Current version: **1.0.0**
 
 - standalone JavaScript widget with no framework dependency
 - compact pill-style search bar with a filter modal
+- filter modal footer with Reset and Apply actions
+- active-filter badge count on the filter button
 - built-in `bp-calendar` datepicker integration
 - Font Awesome Free icons bundled through the widget stylesheet
+- custom Font Awesome icons for inline `fields`
 - runtime inline field management with `addField`, `removeField`, and `updateField`
 - runtime filter management with `addFilter`, `removeFilter`, and `updateFilter`
 - filter types: `input`, `select`, `checkbox`, `radio`, `counter`
@@ -31,8 +34,8 @@ import '@braudypedrosa/bp-calendar/styles';
 
 const widget = new BPSearchWidget('#widget', {
   fields: [
-    { label: 'Promo Code', type: 'input', position: 'start' },
-    { label: 'Guests', type: 'select', options: ['1', '2', '3', '4+'], position: 'end', required: true },
+    { label: 'Promo Code', type: 'input', position: 'start', icon: 'fa-solid fa-ticket' },
+    { label: 'Guests', type: 'select', options: ['1', '2', '3', '4+'], position: 'end', required: true, icon: 'fa-solid fa-users' },
   ],
   filters: [
     { label: 'Bedrooms', type: 'counter', min: 1, max: 8, defaultValue: 2, width: '30%' },
@@ -112,7 +115,7 @@ BP_SearchWidget(container, options)
 - `onSearch: (payload, instance) => void`
 - `onFilterClick: (payload, instance) => void`
 
-`showFilterButton` only renders the icon when at least one filter is configured. Clicking the icon opens the filter modal and still calls `onFilterClick`.
+`showFilterButton` only renders the icon when at least one filter is configured. Clicking the icon opens the filter modal and still calls `onFilterClick`. The modal Reset button clears filter values back to their empty or default state and keeps the modal open. The Apply button just closes the modal; it does not alter validation or trigger search. When filters are active, the filter button shows a badge with the number of active filter fields. `counter` filters only count toward the badge when they differ from their `defaultValue`.
 
 ### `FieldDescriptor`
 
@@ -123,7 +126,8 @@ BP_SearchWidget(container, options)
   options?: string[] | Array<{ label: string, value: string }>,
   position?: 'start' | 'end',
   required?: boolean,
-  key?: string
+  key?: string,
+  icon?: string
 }
 ```
 
@@ -133,7 +137,9 @@ Rules:
 - `position` defaults to `'end'`
 - `required` defaults to `false`
 - `key` defaults to `bp-${slugify(label)}`
+- `icon` accepts a Font Awesome class string such as `'fa-solid fa-users'`
 - `width` is not supported on inline `fields`
+- `icon` is only supported on inline `fields`, not `filters`
 
 ### `FilterDescriptor`
 
