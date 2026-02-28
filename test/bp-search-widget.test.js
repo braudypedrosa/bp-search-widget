@@ -18,16 +18,32 @@ function createWidget(options = {}) {
   });
 }
 
+function selectDateRange(widget, start = '2030-01-10', end = '2030-01-12') {
+  widget.calendar.options.onRangeSelect({
+    start: new Date(`${start}T00:00:00`),
+    end: new Date(`${end}T00:00:00`),
+  });
+}
+
+function openFilters() {
+  const button = document.querySelector('[data-action="filter"]');
+  button.click();
+  return document.querySelector('[data-role="filter-panel"]');
+}
+
 afterEach(() => {
   document.body.innerHTML = '';
 });
 
 describe('BPSearchWidget', () => {
-  it('renders location, dates, filter, and search in the expected order', () => {
+  it('renders location, dates, filter, and search in the expected order when filters exist', () => {
     const widget = createWidget({
       fields: [
         { label: 'Promo Code', type: 'input', position: 'start' },
         { label: 'Guests', type: 'select', options: ['1', '2'], position: 'end' },
+      ],
+      filters: [
+        { label: 'Bedrooms', type: 'counter', min: 1, defaultValue: 1 },
       ],
     });
 
@@ -39,16 +55,27 @@ describe('BPSearchWidget', () => {
     widget.destroy();
   });
 
-  it('auto-generates default keys from labels', () => {
+  it('hides the filter button when no filters are configured', () => {
     const widget = createWidget({
-      fields: [{ label: 'Promo Code', type: 'input' }],
+      fields: [{ label: 'Guests', type: 'select', options: ['1', '2'] }],
     });
 
-    expect(widget.options.fields[0].key).toBe('bp-promo-code');
+    expect(document.querySelector('[data-action="filter"]')).toBeNull();
     widget.destroy();
   });
 
-  it('rejects duplicate keys and invalid field configs', () => {
+  it('auto-generates default keys from labels for fields and filters', () => {
+    const widget = createWidget({
+      fields: [{ label: 'Promo Code', type: 'input' }],
+      filters: [{ label: 'Stay Length', type: 'counter' }],
+    });
+
+    expect(widget.options.fields[0].key).toBe('bp-promo-code');
+    expect(widget.options.filters[0].key).toBe('bp-stay-length');
+    widget.destroy();
+  });
+
+  it('rejects duplicate keys and invalid field or filter configs', () => {
     expect(() => createWidget({
       fields: [
         { label: 'Guests', type: 'select', options: ['1'] },
@@ -59,6 +86,28 @@ describe('BPSearchWidget', () => {
     expect(() => createWidget({
       fields: [{ label: 'Pets', type: 'checkbox' }],
     })).toThrow(/requires a non-empty options array/);
+
+    expect(() => createWidget({
+      fields: [{ label: 'Promo Code', type: 'input', width: '30%' }],
+    })).toThrow(/width is only supported on filters/);
+
+    expect(() => createWidget({
+      filters: [{ label: 'Pets', type: 'checkbox', options: ['Dog'], position: 'end' }],
+    })).toThrow(/does not support position/);
+
+    expect(() => createWidget({
+      fields: [{ label: 'Guests', type: 'input', key: 'bp-shared' }],
+      filters: [{ label: 'Adults', type: 'counter', key: 'bp-shared' }],
+    })).toThrow(/Duplicate key across fields and filters/);
+  });
+
+  it('rejects filter rows that exceed 100 percent width', () => {
+    expect(() => createWidget({
+      filters: [
+        { label: 'One', type: 'input', width: '60%' },
+        { label: 'Two', type: 'input', width: '50%' },
+      ],
+    })).toThrow(/exceed 100%/);
   });
 
   it('preserves declared order within start and end slots', () => {
@@ -108,21 +157,28 @@ describe('BPSearchWidget', () => {
     widget.destroy();
   });
 
-  it('updates fields without allowing key changes', () => {
+  it('adds, updates, and removes filters while preserving filter state', () => {
     const widget = createWidget({
-      fields: [{ label: 'Guests', type: 'select', options: ['1', '2'] }],
+      filters: [{ label: 'Bedrooms', type: 'counter', min: 1, defaultValue: 2 }],
     });
 
-    widget.setSingleChoiceValue('bp-guests', '2');
-    widget.updateField('bp-guests', {
-      label: 'Adults',
-      options: ['2', '3', '4'],
+    widget.addFilter({ label: 'View', type: 'select', options: ['Ocean', 'Garden'], width: '30%' });
+    widget.updateFilter('bp-view', { label: 'Scenery', options: ['Ocean', 'Garden', 'City'] });
+
+    expect(widget.options.filters.map((field) => field.label)).toEqual(['Bedrooms', 'Scenery']);
+    expect(widget.getValues().filters).toEqual({
+      'bp-bedrooms': 2,
+      'bp-view': '',
     });
 
-    expect(document.querySelector('.bp-search-widget__section--custom .bp-search-widget__label').textContent).toBe('Adults');
-    expect(document.querySelector('.bp-search-widget__trigger-value').textContent).toBe('2');
+    widget.removeFilter('bp-view');
 
-    expect(() => widget.updateField('bp-guests', { key: 'bp-adults' })).toThrow(/immutable/);
+    expect(widget.options.filters.map((field) => field.label)).toEqual(['Bedrooms']);
+    expect(widget.getValues().filters).toEqual({
+      'bp-bedrooms': 2,
+    });
+
+    expect(() => widget.updateFilter('bp-bedrooms', { key: 'bp-adults' })).toThrow(/immutable/);
     widget.destroy();
   });
 
@@ -132,6 +188,10 @@ describe('BPSearchWidget', () => {
         { label: 'Promo Code', type: 'input', position: 'start' },
         { label: 'Guests', type: 'select', options: ['1', '2'], position: 'end' },
       ],
+      filters: [
+        { label: 'Bedrooms', type: 'counter', min: 1, max: 5, defaultValue: 2 },
+        { label: 'View', type: 'select', options: ['Ocean', 'Garden'] },
+      ],
     });
 
     document.querySelector('[data-role="location-input"]').value = 'Asheville';
@@ -139,10 +199,9 @@ describe('BPSearchWidget', () => {
     document.querySelector('[data-role="custom-input"]').value = 'SAVE10';
     document.querySelector('[data-role="custom-input"]').dispatchEvent(new Event('input', { bubbles: true }));
     widget.setSingleChoiceValue('bp-guests', '2');
-    widget.calendar.options.onRangeSelect({
-      start: new Date('2030-01-10T00:00:00'),
-      end: new Date('2030-01-14T00:00:00'),
-    });
+    openFilters();
+    widget.setSingleChoiceValue('bp-view', 'Ocean', 'filters');
+    selectDateRange(widget, '2030-01-10', '2030-01-14');
 
     expect(widget.getValues()).toEqual({
       location: 'Asheville',
@@ -151,6 +210,10 @@ describe('BPSearchWidget', () => {
       customFields: {
         'bp-promo-code': 'SAVE10',
         'bp-guests': '2',
+      },
+      filters: {
+        'bp-bedrooms': 2,
+        'bp-view': 'Ocean',
       },
     });
 
@@ -166,10 +229,7 @@ describe('BPSearchWidget', () => {
     searchButton.click();
     expect(onSearch).not.toHaveBeenCalled();
 
-    widget.calendar.options.onRangeSelect({
-      start: new Date('2030-01-10T00:00:00'),
-      end: new Date('2030-01-12T00:00:00'),
-    });
+    selectDateRange(widget);
 
     expect(searchButton.disabled).toBe(false);
     searchButton.click();
@@ -178,6 +238,7 @@ describe('BPSearchWidget', () => {
       checkIn: '2030-01-10',
       checkOut: '2030-01-12',
       customFields: {},
+      filters: {},
     }, widget);
 
     widget.destroy();
@@ -196,10 +257,7 @@ describe('BPSearchWidget', () => {
     const searchButton = document.querySelector('[data-action="search"]');
     const promoInput = document.querySelector('[data-role="custom-input"]');
 
-    widget.calendar.options.onRangeSelect({
-      start: new Date('2030-01-10T00:00:00'),
-      end: new Date('2030-01-12T00:00:00'),
-    });
+    selectDateRange(widget);
     expect(searchButton.disabled).toBe(true);
 
     promoInput.value = '   ';
@@ -226,7 +284,44 @@ describe('BPSearchWidget', () => {
         'bp-guests': '2',
         'bp-pets': ['Dog'],
       },
+      filters: {},
     }, widget);
+
+    widget.destroy();
+  });
+
+  it('keeps search disabled until required filters are filled', () => {
+    const widget = createWidget({
+      filters: [
+        { label: 'Keyword', type: 'input', required: true },
+        { label: 'View', type: 'select', options: ['Ocean', 'Garden'], required: true },
+        { label: 'Amenities', type: 'checkbox', options: ['Pool', 'Spa'], required: true },
+        { label: 'Property', type: 'radio', options: ['Villa', 'Cabin'], required: true },
+        { label: 'Bedrooms', type: 'counter', min: 0, max: 4, defaultValue: 0, required: true },
+      ],
+    });
+
+    selectDateRange(widget);
+    openFilters();
+
+    const searchButton = document.querySelector('[data-action="search"]');
+    const keywordInput = document.querySelector('[data-role="filter-input"]');
+
+    expect(searchButton.disabled).toBe(true);
+
+    keywordInput.value = 'cliffside';
+    keywordInput.dispatchEvent(new Event('input', { bubbles: true }));
+    expect(searchButton.disabled).toBe(true);
+
+    document.querySelector('[data-key="bp-view"]').click();
+    document.querySelector('[data-action="select-option"][data-key="bp-view"][data-value="Ocean"]').click();
+    expect(searchButton.disabled).toBe(true);
+
+    document.querySelector('[data-action="toggle-filter-checkbox"][data-key="bp-amenities"][data-value="Pool"]').click();
+    expect(searchButton.disabled).toBe(true);
+
+    document.querySelector('[data-action="set-filter-radio"][data-key="bp-property"][data-value="Villa"]').click();
+    expect(searchButton.disabled).toBe(false);
 
     widget.destroy();
   });
@@ -234,10 +329,7 @@ describe('BPSearchWidget', () => {
   it('syncs date selection and clear events from the internal datepicker', () => {
     const widget = createWidget();
 
-    widget.calendar.options.onRangeSelect({
-      start: new Date('2030-01-10T00:00:00'),
-      end: new Date('2030-01-13T00:00:00'),
-    });
+    selectDateRange(widget, '2030-01-10', '2030-01-13');
 
     expect(widget.getValues().checkIn).toBe('2030-01-10');
     expect(widget.getValues().checkOut).toBe('2030-01-13');
@@ -251,23 +343,25 @@ describe('BPSearchWidget', () => {
     widget.destroy();
   });
 
-  it('passes current values to the filter callback', () => {
+  it('opens the filter modal, locks scroll, and passes current values to the filter callback', () => {
     const onFilterClick = vi.fn();
     const widget = createWidget({
       onFilterClick,
       fields: [{ label: 'Guests', type: 'select', options: ['1', '2'] }],
+      filters: [{ label: 'Bedrooms', type: 'counter', min: 1, max: 5, defaultValue: 2 }],
     });
 
     document.querySelector('[data-role="location-input"]').value = 'Sedona';
     document.querySelector('[data-role="location-input"]').dispatchEvent(new Event('input', { bubbles: true }));
     widget.setSingleChoiceValue('bp-guests', '2');
-    widget.calendar.options.onRangeSelect({
-      start: new Date('2030-01-10T00:00:00'),
-      end: new Date('2030-01-12T00:00:00'),
-    });
+    selectDateRange(widget);
 
-    document.querySelector('[data-action="filter"]').click();
+    const filterButton = document.querySelector('[data-action="filter"]');
+    filterButton.click();
 
+    expect(document.querySelector('[data-role="filter-panel"]')).not.toBeNull();
+    expect(document.querySelector('[data-role="filter-dialog"]')).not.toBeNull();
+    expect(document.body.style.overflow).toBe('hidden');
     expect(onFilterClick).toHaveBeenCalledWith({
       location: 'Sedona',
       checkIn: '2030-01-10',
@@ -275,7 +369,15 @@ describe('BPSearchWidget', () => {
       customFields: {
         'bp-guests': '2',
       },
+      filters: {
+        'bp-bedrooms': 2,
+      },
     }, widget);
+
+    document.querySelector('[data-action="close-filter-panel"]').click();
+    expect(document.querySelector('[data-role="filter-panel"]')).toBeNull();
+    expect(document.body.style.overflow).toBe('');
+    expect(onFilterClick).toHaveBeenCalledTimes(1);
 
     widget.destroy();
   });
@@ -310,49 +412,160 @@ describe('BPSearchWidget', () => {
     widget.destroy();
   });
 
-  it('closes an open choice popover when the datepicker is clicked', () => {
+  it('opens and closes filter select popovers inside the panel', () => {
     const widget = createWidget({
-      fields: [{ label: 'Guests', type: 'select', options: ['1', '2'] }],
+      filters: [{ label: 'View', type: 'select', options: ['Ocean', 'Garden'] }],
     });
 
-    document.querySelector('[data-key="bp-guests"]').click();
+    openFilters();
+    document.querySelector('[data-key="bp-view"]').click();
     expect(document.querySelector('.bp-search-widget__popover')).not.toBeNull();
+    expect(document.querySelector('[data-filter-popover-key="bp-view"] .bp-search-widget__popover')).not.toBeNull();
 
-    document.querySelector('.bp-calendar-datepicker-input').click();
+    document.querySelector('[data-action="select-option"][data-key="bp-view"][data-value="Garden"]').click();
 
     expect(document.querySelector('.bp-search-widget__popover')).toBeNull();
+    expect(document.querySelector('[data-filter-key="bp-view"] .bp-search-widget__trigger-value').textContent).toBe('Garden');
+
     widget.destroy();
   });
 
-  it('recreates the internal calendar on updateOptions and preserves the selected range', () => {
-    const widget = createWidget();
+  it('hides the datepicker popup when the filter modal opens', () => {
+    const widget = createWidget({
+      filters: [{ label: 'View', type: 'select', options: ['Ocean', 'Garden'] }],
+    });
+
+    const dateInput = document.querySelector('.bp-calendar-datepicker-input');
+    const popup = document.querySelector('.bp-calendar-datepicker-popup');
+
+    dateInput.click();
+    expect(popup.style.display).toBe('block');
+
+    openFilters();
+
+    expect(document.querySelector('[data-role="filter-panel"]')).not.toBeNull();
+    expect(popup.style.display).toBe('none');
+    widget.destroy();
+  });
+
+  it('calculates per-row filter widths for mixed and auto sized filters', () => {
+    const widget = createWidget({
+      filters: [
+        { label: 'One', type: 'input', width: '30%' },
+        { label: 'Two', type: 'input', width: 30 },
+        { label: 'Three', type: 'input' },
+        { label: 'Four', type: 'input' },
+        { label: 'Five', type: 'input', width: '50%' },
+        { label: 'Six', type: 'input' },
+      ],
+    });
+
+    openFilters();
+
+    const cards = Array.from(document.querySelectorAll('.bp-search-widget__filter-card'));
+
+    expect(cards[0].style.getPropertyValue('--bp-filter-width')).toBe('30%');
+    expect(cards[1].style.getPropertyValue('--bp-filter-width')).toBe('30%');
+    expect(cards[2].style.getPropertyValue('--bp-filter-width')).toBe('20%');
+    expect(cards[3].style.getPropertyValue('--bp-filter-width')).toBe('20%');
+    expect(cards[4].style.getPropertyValue('--bp-filter-width')).toBe('50%');
+    expect(cards[5].style.getPropertyValue('--bp-filter-width')).toBe('50%');
+
+    widget.destroy();
+  });
+
+  it('supports counter filters with defaults, step changes, bounds, and normalized input', () => {
+    const widget = createWidget({
+      filters: [{ label: 'Bedrooms', type: 'counter', min: 0, max: 6, step: 2, defaultValue: 2 }],
+    });
+
+    openFilters();
+
+    const input = document.querySelector('[data-role="filter-counter-input"]');
+    const decrementButton = document.querySelector('[data-action="decrement-filter-counter"]');
+    const incrementButton = document.querySelector('[data-action="increment-filter-counter"]');
+
+    expect(input.value).toBe('2');
+
+    incrementButton.click();
+    expect(input.value).toBe('4');
+
+    incrementButton.click();
+    expect(input.value).toBe('6');
+    expect(incrementButton.disabled).toBe(true);
+
+    decrementButton.click();
+    expect(input.value).toBe('4');
+
+    input.value = '5';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    expect(input.value).toBe('6');
+
+    input.value = '100';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    expect(input.value).toBe('6');
+
+    widget.destroy();
+  });
+
+  it('recreates the internal calendar on updateOptions and preserves the selected range and filter state', () => {
+    const widget = createWidget({
+      filters: [{ label: 'View', type: 'select', options: ['Ocean', 'Garden'] }],
+    });
     const originalCalendar = widget.calendar;
 
-    widget.calendar.options.onRangeSelect({
-      start: new Date('2030-01-10T00:00:00'),
-      end: new Date('2030-01-12T00:00:00'),
-    });
+    selectDateRange(widget);
+    widget.setSingleChoiceValue('bp-view', 'Garden', 'filters');
 
     widget.updateOptions({
       calendarOptions: {
         startDate: new Date('2030-02-01T00:00:00'),
         monthsToShow: 2,
       },
+      filters: [{ label: 'Scenery', type: 'select', key: 'bp-view', options: ['Ocean', 'Garden', 'City'] }],
     });
 
     expect(widget.calendar).not.toBe(originalCalendar);
     expect(widget.getValues().checkIn).toBe('2030-01-10');
     expect(widget.getValues().checkOut).toBe('2030-01-12');
+    expect(widget.getValues().filters).toEqual({
+      'bp-view': 'Garden',
+    });
+
+    widget.destroy();
+  });
+
+  it('closes the filter modal and popovers on overlay click and escape', () => {
+    const widget = createWidget({
+      filters: [{ label: 'View', type: 'select', options: ['Ocean', 'Garden'] }],
+    });
+
+    openFilters();
+    document.querySelector('[data-key="bp-view"]').click();
+    expect(document.querySelector('.bp-search-widget__popover')).not.toBeNull();
+
+    document.querySelector('[data-role="filter-backdrop"]').click();
+    expect(document.querySelector('[data-role="filter-panel"]')).toBeNull();
+    expect(document.querySelector('.bp-search-widget__popover')).toBeNull();
+    expect(document.body.style.overflow).toBe('');
+
+    openFilters();
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    expect(document.querySelector('[data-role="filter-panel"]')).toBeNull();
+    expect(document.body.style.overflow).toBe('');
+
     widget.destroy();
   });
 
   it('destroys DOM and calendar side effects cleanly', () => {
     const widget = createWidget({
       fields: [{ label: 'Pets', type: 'checkbox', options: ['Dog'] }],
+      filters: [{ label: 'Bedrooms', type: 'counter', min: 1, defaultValue: 2 }],
     });
 
     document.querySelector('[data-key="bp-pets"]').click();
     expect(document.querySelector('.bp-calendar-tooltip')).not.toBeNull();
+    openFilters();
 
     widget.destroy();
 

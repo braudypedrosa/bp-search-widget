@@ -29,7 +29,11 @@ fi
 git fetch origin main --tags
 git pull --rebase origin main
 
-NEW_TAG="$(npm version "$BUMP" -m "chore(release): %s")"
+if [[ "$is_valid_bump" == "true" ]]; then
+  NEW_TAG="$(npm version "$BUMP" -m "chore(release): %s")"
+else
+  NEW_TAG="$(npm version --allow-same-version "$BUMP" -m "chore(release): %s")"
+fi
 
 git push origin main --follow-tags
 npm publish
