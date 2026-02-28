@@ -464,11 +464,13 @@
 .bp-search-widget__counter-input::-webkit-outer-spin-button,
 .bp-search-widget__counter-input::-webkit-inner-spin-button {
   -webkit-appearance: none;
+  appearance: none;
   margin: 0;
 }
 
 .bp-search-widget__counter-input[type="number"] {
   -moz-appearance: textfield;
+  appearance: textfield;
 }
 
 .bp-search-widget__section--dates .bp-calendar-datepicker-wrapper {
