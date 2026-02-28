@@ -1,0 +1,56 @@
+{
+  "name": "@braudypedrosa/bp-search-widget",
+  "version": "1.0.0",
+  "description": "Framework-agnostic vacation rental search widget powered by bp-calendar",
+  "type": "module",
+  "main": "./bp-search-widget.js",
+  "module": "./bp-search-widget.js",
+  "exports": {
+    ".": "./bp-search-widget.js",
+    "./styles": "./bp-search-widget.scss"
+  },
+  "files": [
+    "bp-search-widget.js",
+    "bp-search-widget.scss",
+    "README.md",
+    "LICENSE"
+  ],
+  "keywords": [
+    "search-widget",
+    "vacation-rental",
+    "booking",
+    "datepicker",
+    "javascript"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/braudypedrosa/bp-search-widget.git"
+  },
+  "bugs": {
+    "url": "https://github.com/braudypedrosa/bp-search-widget/issues"
+  },
+  "homepage": "https://github.com/braudypedrosa/bp-search-widget#readme",
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "dev": "vite",
+    "test": "vitest run --environment jsdom",
+    "release": "bash ./scripts/release.sh",
+    "release:patch": "bash ./scripts/release.sh patch",
+    "release:minor": "bash ./scripts/release.sh minor",
+    "release:major": "bash ./scripts/release.sh major",
+    "release:npm": "npm publish"
+  },
+  "dependencies": {
+    "@fortawesome/fontawesome-free": "^7.0.1",
+    "@braudypedrosa/bp-calendar": "^1.0.1"
+  },
+  "devDependencies": {
+    "jsdom": "^26.0.0",
+    "sass-embedded": "^1.83.4",
+    "vite": "^6.2.0",
+    "vitest": "^3.0.8"
+  }
+}
