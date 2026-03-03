@@ -2,8 +2,6 @@
 
 A framework-agnostic vacation rental search widget powered by [`@braudypedrosa/bp-calendar`](https://www.npmjs.com/package/@braudypedrosa/bp-calendar).
 
-Current version: **1.0.0**
-
 ## Features
 
 - standalone JavaScript widget with no framework dependency
@@ -11,7 +9,7 @@ Current version: **1.0.0**
 - filter modal footer with Reset and Apply actions
 - active-filter badge count on the filter button
 - built-in `bp-calendar` datepicker integration
-- Font Awesome Free icons bundled through the widget stylesheet
+- Font Awesome Free icons supported through an explicit stylesheet import
 - custom Font Awesome icons for inline `fields`
 - runtime inline field management with `addField`, `removeField`, and `updateField`
 - runtime filter management with `addFilter`, `removeFilter`, and `updateFilter`
@@ -22,13 +20,14 @@ Current version: **1.0.0**
 ## Installation
 
 ```bash
-npm install @braudypedrosa/bp-search-widget @braudypedrosa/bp-calendar
+npm install @braudypedrosa/bp-search-widget @braudypedrosa/bp-calendar @fortawesome/fontawesome-free
 ```
 
 ## Usage
 
 ```js
 import { BPSearchWidget } from '@braudypedrosa/bp-search-widget';
+import '@fortawesome/fontawesome-free/css/all.min.css';
 import '@braudypedrosa/bp-search-widget/styles';
 import '@braudypedrosa/bp-calendar/styles';
 
@@ -58,7 +57,7 @@ const widget = new BPSearchWidget('#widget', {
 
 The visible date UI is a single combined field, but the widget output always exposes separate `checkIn` and `checkOut` values.
 
-`@braudypedrosa/bp-search-widget/styles` pulls in Font Awesome Free internally, so you do not need a separate icon import.
+The widget uses Font Awesome class names for its built-in icons and inline `fields`, so import `@fortawesome/fontawesome-free/css/all.min.css` once in your app before rendering the widget.
 
 ## Browser Global
 
@@ -72,6 +71,7 @@ Example:
 ```html
 <div id="widget"></div>
 <script type="module">
+  import '@fortawesome/fontawesome-free/css/all.min.css';
   import '@braudypedrosa/bp-calendar/styles';
   import '@braudypedrosa/bp-search-widget/styles';
   import '@braudypedrosa/bp-search-widget';
