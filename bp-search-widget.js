@@ -1,4 +1,10 @@
 import { BPCalendar } from '@braudypedrosa/bp-calendar';
+import {
+  BPUICheckboxGroup,
+  BPUICounter,
+  BPUIRadioGroup,
+  BPUISelect,
+} from '@braudypedrosa/bp-ui-components';
 
 const MAIN_FIELD_TYPES = new Set(['input', 'select', 'checkbox', 'radio']);
 const FILTER_FIELD_TYPES = new Set(['input', 'select', 'checkbox', 'radio', 'counter']);
@@ -31,11 +37,21 @@ class BPSearchWidget {
     this.openPopover = null;
     this.isFilterPanelOpen = false;
     this.isDestroyed = false;
+    this.uiInstances = {
+      selects: new Map(),
+      counters: new Map(),
+      radios: new Map(),
+      checkboxes: new Map(),
+    };
     this.boundHandleContainerCaptureClick = this.handleContainerCaptureClick.bind(this);
     this.boundHandleContainerClick = this.handleContainerClick.bind(this);
     this.boundHandleContainerInput = this.handleContainerInput.bind(this);
     this.boundHandleContainerFocusout = this.handleContainerFocusout.bind(this);
     this.boundHandleContainerKeydown = this.handleContainerKeydown.bind(this);
+    this.boundHandleBPUISelectChange = this.handleBPUISelectChange.bind(this);
+    this.boundHandleBPUICounterChange = this.handleBPUICounterChange.bind(this);
+    this.boundHandleBPUIRadioChange = this.handleBPUIRadioChange.bind(this);
+    this.boundHandleBPUICheckboxChange = this.handleBPUICheckboxChange.bind(this);
     this.boundHandleDocumentClick = this.handleDocumentClick.bind(this);
     this.boundHandleDocumentKeydown = this.handleDocumentKeydown.bind(this);
     this.boundHandleFilterLayoutScroll = this.handleFilterLayoutScroll.bind(this);
@@ -438,6 +454,10 @@ class BPSearchWidget {
     this.container.addEventListener('input', this.boundHandleContainerInput);
     this.container.addEventListener('focusout', this.boundHandleContainerFocusout);
     this.container.addEventListener('keydown', this.boundHandleContainerKeydown);
+    this.container.addEventListener('bp-ui:select:change', this.boundHandleBPUISelectChange);
+    this.container.addEventListener('bp-ui:counter:change', this.boundHandleBPUICounterChange);
+    this.container.addEventListener('bp-ui:radio:change', this.boundHandleBPUIRadioChange);
+    this.container.addEventListener('bp-ui:checkbox:change', this.boundHandleBPUICheckboxChange);
     document.addEventListener('click', this.boundHandleDocumentClick);
     document.addEventListener('keydown', this.boundHandleDocumentKeydown);
   }
@@ -448,6 +468,10 @@ class BPSearchWidget {
     this.container.removeEventListener('input', this.boundHandleContainerInput);
     this.container.removeEventListener('focusout', this.boundHandleContainerFocusout);
     this.container.removeEventListener('keydown', this.boundHandleContainerKeydown);
+    this.container.removeEventListener('bp-ui:select:change', this.boundHandleBPUISelectChange);
+    this.container.removeEventListener('bp-ui:counter:change', this.boundHandleBPUICounterChange);
+    this.container.removeEventListener('bp-ui:radio:change', this.boundHandleBPUIRadioChange);
+    this.container.removeEventListener('bp-ui:checkbox:change', this.boundHandleBPUICheckboxChange);
     document.removeEventListener('click', this.boundHandleDocumentClick);
     document.removeEventListener('keydown', this.boundHandleDocumentKeydown);
   }
@@ -455,6 +479,7 @@ class BPSearchWidget {
   render() {
     const shouldKeepFilterPanelOpen = this.isFilterPanelOpen && this.shouldRenderFilterButton();
 
+    this.destroyUIInstances();
     this.destroyCalendar();
     this.closeChoicePopover();
     if (this.isFilterPanelOpen) {
@@ -465,6 +490,7 @@ class BPSearchWidget {
 
     this.container.innerHTML = '';
     this.container.classList.add('bp-search-widget-host');
+    this.container.classList.add('bp-widget-reset');
 
     const root = this.createElement('div', 'bp-search-widget');
     const bar = this.createElement('div', 'bp-search-widget__bar');
@@ -505,6 +531,7 @@ class BPSearchWidget {
     this.elements.searchButton = searchButton;
 
     this.container.appendChild(root);
+    this.mountFieldUIControls();
 
     if (shouldKeepFilterPanelOpen) {
       this.openFilterPanel();
@@ -559,7 +586,11 @@ class BPSearchWidget {
       return this.renderInputField(field);
     }
 
-    return this.renderChoiceField(field, 'fields');
+    if (field.type === 'select') {
+      return this.renderSelectField(field, 'fields');
+    }
+
+    return this.renderLegacyChoiceField(field, 'fields');
   }
 
   renderInputField(field) {
@@ -587,7 +618,7 @@ class BPSearchWidget {
     return section;
   }
 
-  renderChoiceField(field, collection) {
+  renderLegacyChoiceField(field, collection) {
     const section = collection === 'fields'
       ? this.createSectionBase('custom')
       : this.createElement('div', 'bp-search-widget__filter-select');
@@ -627,6 +658,32 @@ class BPSearchWidget {
     section.appendChild(trigger);
     section.setAttribute('data-filter-popover-key', field.key);
     return section;
+  }
+
+  renderSelectField(field, collection) {
+    const selectRoot = this.createBPUISelectRoot(field, collection);
+
+    if (collection === 'fields') {
+      const section = this.createSectionBase('custom');
+      const content = this.createFieldContent();
+      const label = this.createFieldLabel(field.label);
+      const icon = field.icon ? this.createIconWrapper(this.getCustomFieldIcon(field.icon)) : null;
+
+      content.appendChild(label);
+      content.appendChild(selectRoot);
+      if (icon) {
+        section.classList.add('bp-search-widget__section--has-icon');
+        section.appendChild(icon);
+      }
+      section.appendChild(content);
+      section.setAttribute('data-field-key', field.key);
+      section.classList.add('bp-search-widget__section--choice');
+      return section;
+    }
+
+    const wrapper = this.createElement('div', 'bp-search-widget__filter-select');
+    wrapper.appendChild(selectRoot);
+    return wrapper;
   }
 
   renderFilterButton() {
@@ -735,7 +792,7 @@ class BPSearchWidget {
     }
 
     if (field.type === 'select') {
-      card.appendChild(this.renderChoiceField(field, 'filters'));
+      card.appendChild(this.renderSelectField(field, 'filters'));
       return card;
     }
 
@@ -761,62 +818,165 @@ class BPSearchWidget {
   }
 
   renderFilterChoiceGroup(field) {
-    const group = this.createElement('div', 'bp-search-widget__filter-choices');
+    const root = this.createElement(
+      'div',
+      field.type === 'checkbox'
+        ? 'bp-search-widget__filter-choices bp-ui-checkbox bp-ui-checkbox--pill'
+        : 'bp-search-widget__filter-choices bp-ui-radio bp-ui-radio--pill',
+    );
+    const group = this.createElement(
+      'div',
+      field.type === 'checkbox' ? 'bp-ui-checkbox__group' : 'bp-ui-radio__group',
+    );
+
+    root.setAttribute(field.type === 'checkbox' ? 'data-bp-ui-checkbox' : 'data-bp-ui-radio', '');
+    root.setAttribute('data-variant', 'pill');
+    root.setAttribute('data-bp-search-widget-control', field.type);
+    root.setAttribute('data-collection', 'filters');
+    root.setAttribute('data-key', field.key);
+    root.setAttribute('aria-label', field.label);
+
+    if (field.type === 'checkbox') {
+      root.dataset.values = Array.isArray(this.state.filters[field.key]) ? this.state.filters[field.key].join(',') : '';
+    } else {
+      root.dataset.value = typeof this.state.filters[field.key] === 'string' ? this.state.filters[field.key] : '';
+    }
 
     field.options.forEach((option) => {
-      const button = this.createElement('button', 'bp-search-widget__filter-choice');
+      const optionLabel = this.createElement(
+        'label',
+        field.type === 'checkbox' ? 'bp-ui-checkbox__option' : 'bp-ui-radio__option',
+      );
+      const input = this.createElement(
+        'input',
+        field.type === 'checkbox' ? 'bp-ui-checkbox__input' : 'bp-ui-radio__input',
+      );
+      const control = this.createElement(
+        'span',
+        field.type === 'checkbox' ? 'bp-ui-checkbox__control' : 'bp-ui-radio__control',
+      );
+      const content = this.createElement(
+        'span',
+        field.type === 'checkbox' ? 'bp-ui-checkbox__content' : 'bp-ui-radio__content',
+      );
+      const header = this.createElement(
+        'span',
+        field.type === 'checkbox' ? 'bp-ui-checkbox__header' : 'bp-ui-radio__header',
+      );
+      const text = this.createElement(
+        'span',
+        field.type === 'checkbox' ? 'bp-ui-checkbox__option-label' : 'bp-ui-radio__option-label',
+        option.label,
+      );
       const isSelected = this.isOptionSelected(field, option.value, 'filters');
 
-      button.type = 'button';
-      button.textContent = option.label;
-      button.classList.toggle('is-selected', isSelected);
-      button.setAttribute('data-key', field.key);
-      button.setAttribute('data-value', option.value);
-      button.setAttribute('data-action', field.type === 'checkbox' ? 'toggle-filter-checkbox' : 'set-filter-radio');
+      input.type = field.type;
+      input.value = option.value;
+      if (field.type === 'checkbox') {
+        input.checked = isSelected;
+      } else if (isSelected) {
+        input.checked = true;
+      }
 
-      group.appendChild(button);
+      control.setAttribute('aria-hidden', 'true');
+      header.appendChild(text);
+      content.appendChild(header);
+      optionLabel.appendChild(input);
+      optionLabel.appendChild(control);
+      optionLabel.appendChild(content);
+      group.appendChild(optionLabel);
     });
 
-    return group;
+    root.appendChild(group);
+    return root;
   }
 
   renderCounterControl(field) {
-    const control = this.createElement('div', 'bp-search-widget__counter');
-    const decrementButton = this.createElement('button', 'bp-search-widget__counter-button bp-search-widget__counter-button--decrement');
-    const input = this.createElement('input', 'bp-search-widget__counter-input');
-    const incrementButton = this.createElement('button', 'bp-search-widget__counter-button bp-search-widget__counter-button--increment');
-    const currentValue = this.state.filters[field.key];
+    const control = this.createElement('div', 'bp-search-widget__counter bp-ui-counter');
+    const decrementButton = this.createElement('button', 'bp-ui-counter__button bp-ui-counter__button--decrement');
+    const fieldWrapper = this.createElement('div', 'bp-ui-counter__field');
+    const input = this.createElement('input', 'bp-ui-counter__input');
+    const incrementButton = this.createElement('button', 'bp-ui-counter__button bp-ui-counter__button--increment');
+
+    control.setAttribute('data-bp-ui-counter', '');
+    control.setAttribute('data-bp-search-widget-control', 'counter');
+    control.setAttribute('data-collection', 'filters');
+    control.setAttribute('data-key', field.key);
+    control.setAttribute('data-value', String(this.state.filters[field.key]));
+    control.setAttribute('data-min', String(field.min));
+    control.setAttribute('data-step', String(field.step));
+    control.setAttribute('data-snap-to-step', 'true');
+    control.setAttribute('aria-label', field.label);
+    if (Number.isFinite(field.max)) {
+      control.setAttribute('data-max', String(field.max));
+    }
 
     decrementButton.type = 'button';
-    decrementButton.setAttribute('data-action', 'decrement-filter-counter');
-    decrementButton.setAttribute('data-key', field.key);
     decrementButton.setAttribute('aria-label', `Decrease ${field.label}`);
     decrementButton.innerHTML = this.getMinusIcon();
-    decrementButton.disabled = currentValue <= field.min;
 
     input.type = 'number';
-    input.value = String(currentValue);
-    input.min = String(field.min);
-    if (Number.isFinite(field.max)) {
-      input.max = String(field.max);
-    }
-    input.step = String(field.step);
-    input.setAttribute('data-role', 'filter-counter-input');
-    input.setAttribute('data-key', field.key);
+    input.inputMode = 'numeric';
     input.setAttribute('aria-label', field.label);
 
     incrementButton.type = 'button';
-    incrementButton.setAttribute('data-action', 'increment-filter-counter');
-    incrementButton.setAttribute('data-key', field.key);
     incrementButton.setAttribute('aria-label', `Increase ${field.label}`);
     incrementButton.innerHTML = this.getPlusIcon();
-    incrementButton.disabled = currentValue >= field.max;
 
+    fieldWrapper.appendChild(input);
     control.appendChild(decrementButton);
-    control.appendChild(input);
+    control.appendChild(fieldWrapper);
     control.appendChild(incrementButton);
 
     return control;
+  }
+
+  createBPUISelectRoot(field, collection) {
+    const root = this.createElement('div', 'bp-search-widget__select bp-ui-select');
+    const trigger = this.createElement('button', 'bp-ui-select__trigger');
+    const triggerValue = this.createElement('span', 'bp-ui-select__trigger-value', this.getFieldSummary(field, collection));
+    const triggerChevron = this.createElement('span', 'bp-ui-select__trigger-chevron');
+    const input = this.createElement('input', 'bp-ui-select__input');
+    const popover = this.createElement('div', 'bp-ui-select__popover');
+
+    root.setAttribute('data-bp-ui-select', '');
+    root.setAttribute('data-bp-search-widget-control', 'select');
+    root.setAttribute('data-collection', collection);
+    root.setAttribute('data-key', field.key);
+    root.setAttribute('data-name', field.key);
+    root.setAttribute('data-placeholder', `Select ${field.label}`);
+    root.setAttribute('aria-label', field.label);
+    if (typeof (collection === 'filters' ? this.state.filters[field.key] : this.state.customFields[field.key]) === 'string') {
+      root.dataset.value = collection === 'filters' ? this.state.filters[field.key] : this.state.customFields[field.key];
+    }
+
+    trigger.type = 'button';
+    trigger.setAttribute('aria-haspopup', 'listbox');
+    input.type = 'hidden';
+    popover.setAttribute('role', 'listbox');
+
+    triggerChevron.innerHTML = this.getChevronIcon();
+    trigger.appendChild(triggerValue);
+    trigger.appendChild(triggerChevron);
+
+    field.options.forEach((option) => {
+      const button = this.createElement('button', 'bp-ui-select__option');
+      const label = this.createElement('span', 'bp-ui-select__option-label', option.label);
+      const indicator = this.createElement('span', 'bp-ui-select__option-indicator');
+
+      button.type = 'button';
+      button.setAttribute('data-value', option.value);
+      indicator.setAttribute('aria-hidden', 'true');
+      button.appendChild(label);
+      button.appendChild(indicator);
+      popover.appendChild(button);
+    });
+
+    root.appendChild(trigger);
+    root.appendChild(input);
+    root.appendChild(popover);
+
+    return root;
   }
 
   createSectionBase(name) {
@@ -937,6 +1097,154 @@ class BPSearchWidget {
     }
   }
 
+  getUIInstanceToken(collection, key) {
+    return `${collection}:${key}`;
+  }
+
+  destroyMappedInstances(instanceMap, collection = null) {
+    instanceMap.forEach((instance, token) => {
+      if (collection && !token.startsWith(`${collection}:`)) {
+        return;
+      }
+
+      if (typeof instance.destroy === 'function') {
+        instance.destroy();
+      }
+
+      instanceMap.delete(token);
+    });
+  }
+
+  destroyUIInstances(collection = null) {
+    this.destroyMappedInstances(this.uiInstances.selects, collection);
+    this.destroyMappedInstances(this.uiInstances.counters, collection);
+    this.destroyMappedInstances(this.uiInstances.radios, collection);
+    this.destroyMappedInstances(this.uiInstances.checkboxes, collection);
+  }
+
+  findUIControlRoot(type, collection, key) {
+    return Array.from(this.container.querySelectorAll(`[data-bp-search-widget-control="${type}"][data-collection="${collection}"]`))
+      .find((element) => element.getAttribute('data-key') === key) || null;
+  }
+
+  mountFieldUIControls() {
+    this.options.fields.forEach((field) => {
+      if (field.type === 'select') {
+        const token = this.getUIInstanceToken('fields', field.key);
+        const root = this.findUIControlRoot('select', 'fields', field.key);
+
+        if (root && !this.uiInstances.selects.has(token)) {
+          this.uiInstances.selects.set(token, new BPUISelect(root));
+        }
+      }
+    });
+  }
+
+  mountFilterUIControls() {
+    this.options.filters.forEach((field) => {
+      const token = this.getUIInstanceToken('filters', field.key);
+
+      if (field.type === 'select') {
+        const root = this.findUIControlRoot('select', 'filters', field.key);
+        if (root && !this.uiInstances.selects.has(token)) {
+          this.uiInstances.selects.set(token, new BPUISelect(root));
+        }
+      }
+
+      if (field.type === 'counter') {
+        const root = this.findUIControlRoot('counter', 'filters', field.key);
+        if (root && !this.uiInstances.counters.has(token)) {
+          this.uiInstances.counters.set(token, new BPUICounter(root));
+        }
+      }
+
+      if (field.type === 'radio') {
+        const root = this.findUIControlRoot('radio', 'filters', field.key);
+        if (root && !this.uiInstances.radios.has(token)) {
+          this.uiInstances.radios.set(token, new BPUIRadioGroup(root));
+        }
+      }
+
+      if (field.type === 'checkbox') {
+        const root = this.findUIControlRoot('checkbox', 'filters', field.key);
+        if (root && !this.uiInstances.checkboxes.has(token)) {
+          this.uiInstances.checkboxes.set(token, new BPUICheckboxGroup(root));
+        }
+      }
+    });
+  }
+
+  handleBPUISelectChange(event) {
+    const root = event.target;
+
+    if (!(root instanceof Element)) {
+      return;
+    }
+
+    const key = root.getAttribute('data-key');
+    const collection = root.getAttribute('data-collection') || 'fields';
+
+    if (!key) {
+      return;
+    }
+
+    if (collection === 'filters') {
+      this.state.filters[key] = event.detail.value;
+    } else {
+      this.state.customFields[key] = event.detail.value;
+    }
+
+    this.syncSearchDisabledState();
+  }
+
+  handleBPUICounterChange(event) {
+    const root = event.target;
+
+    if (!(root instanceof Element)) {
+      return;
+    }
+
+    const key = root.getAttribute('data-key');
+    if (!key) {
+      return;
+    }
+
+    this.state.filters[key] = event.detail.value;
+    this.syncSearchDisabledState();
+  }
+
+  handleBPUIRadioChange(event) {
+    const root = event.target;
+
+    if (!(root instanceof Element)) {
+      return;
+    }
+
+    const key = root.getAttribute('data-key');
+    if (!key) {
+      return;
+    }
+
+    this.state.filters[key] = event.detail.value;
+    this.syncSearchDisabledState();
+  }
+
+  handleBPUICheckboxChange(event) {
+    const root = event.target;
+
+    if (!(root instanceof Element)) {
+      return;
+    }
+
+    const key = root.getAttribute('data-key');
+    if (!key) {
+      return;
+    }
+
+    this.state.filters[key] = event.detail.values;
+    this.syncSearchDisabledState();
+  }
+
   destroyCalendar() {
     if (this.calendar && typeof this.calendar.destroy === 'function') {
       this.calendar.destroy();
@@ -1044,36 +1352,6 @@ class BPSearchWidget {
       return;
     }
 
-    const filterRadioOption = target.closest('[data-action="set-filter-radio"]');
-    if (filterRadioOption) {
-      const key = filterRadioOption.getAttribute('data-key');
-      const value = filterRadioOption.getAttribute('data-value') || '';
-      this.setSingleChoiceValue(key, value, 'filters');
-      this.refreshFilterChoiceGroup(key);
-      return;
-    }
-
-    const filterCheckboxOption = target.closest('[data-action="toggle-filter-checkbox"]');
-    if (filterCheckboxOption) {
-      const key = filterCheckboxOption.getAttribute('data-key');
-      const value = filterCheckboxOption.getAttribute('data-value') || '';
-      this.toggleCheckboxValue(key, value, 'filters');
-      this.refreshFilterChoiceGroup(key);
-      return;
-    }
-
-    const decrementCounterButton = target.closest('[data-action="decrement-filter-counter"]');
-    if (decrementCounterButton) {
-      const key = decrementCounterButton.getAttribute('data-key');
-      this.adjustFilterCounter(key, -1);
-      return;
-    }
-
-    const incrementCounterButton = target.closest('[data-action="increment-filter-counter"]');
-    if (incrementCounterButton) {
-      const key = incrementCounterButton.getAttribute('data-key');
-      this.adjustFilterCounter(key, 1);
-    }
   }
 
   handleContainerInput(event) {
@@ -1107,12 +1385,6 @@ class BPSearchWidget {
       return;
     }
 
-    if (target.matches('[data-role="filter-counter-input"]')) {
-      const key = target.getAttribute('data-key');
-      if (key) {
-        this.commitCounterInput(key, target);
-      }
-    }
   }
 
   handleContainerFocusout(event) {
@@ -1121,12 +1393,6 @@ class BPSearchWidget {
       return;
     }
 
-    if (target.matches('[data-role="filter-counter-input"]')) {
-      const key = target.getAttribute('data-key');
-      if (key) {
-        this.commitCounterInput(key, target);
-      }
-    }
   }
 
   handleContainerKeydown(event) {
@@ -1142,7 +1408,6 @@ class BPSearchWidget {
     if (
       target.matches('.bp-search-widget__input')
       || target.matches('.bp-search-widget__filter-input')
-      || target.matches('.bp-search-widget__counter-input')
     ) {
       event.preventDefault();
       this.handleSearch();
@@ -1218,11 +1483,11 @@ class BPSearchWidget {
       return;
     }
 
-    if (collection === 'filters' && field.type !== 'select') {
+    if (collection === 'filters') {
       return;
     }
 
-    if (collection === 'fields' && !CHOICE_FIELD_TYPES.has(field.type)) {
+    if (collection === 'fields' && !new Set(['checkbox', 'radio']).has(field.type)) {
       return;
     }
 
@@ -1338,6 +1603,7 @@ class BPSearchWidget {
     this.elements.root.appendChild(panel);
     this.elements.filterPanel = panel;
     this.isFilterPanelOpen = true;
+    this.mountFilterUIControls();
     this.lockBodyScroll();
 
     if (this.elements.filterButton) {
@@ -1355,6 +1621,7 @@ class BPSearchWidget {
     }
 
     this.closeChoicePopover();
+    this.destroyUIInstances('filters');
 
     if (this.elements.filterPanel) {
       this.elements.filterPanel.remove();
@@ -1425,6 +1692,22 @@ class BPSearchWidget {
       return;
     }
 
+    if (field.type === 'select') {
+      const instance = this.uiInstances.selects.get(this.getUIInstanceToken(collection, key));
+      if (instance) {
+        instance.setValue(value, 'api');
+        return;
+      }
+    }
+
+    if (field.type === 'radio' && collection === 'filters') {
+      const instance = this.uiInstances.radios.get(this.getUIInstanceToken(collection, key));
+      if (instance) {
+        instance.setValue(value, 'api');
+        return;
+      }
+    }
+
     if (collection === 'filters') {
       this.state.filters[key] = value;
     } else {
@@ -1440,6 +1723,14 @@ class BPSearchWidget {
     const field = collection === 'filters' ? this.getFilterByKey(key) : this.getFieldByKey(key);
     if (!field) {
       return;
+    }
+
+    if (field.type === 'checkbox' && collection === 'filters') {
+      const instance = this.uiInstances.checkboxes.get(this.getUIInstanceToken(collection, key));
+      if (instance) {
+        instance.toggleValue(value, 'api');
+        return;
+      }
     }
 
     const values = collection === 'filters' ? this.state.filters : this.state.customFields;
@@ -1487,79 +1778,9 @@ class BPSearchWidget {
     }
   }
 
-  refreshFilterChoiceGroup(key) {
-    const filter = this.getFilterByKey(key);
-    const card = this.getFilterCardElement(key);
-    if (!filter || !card) {
-      return;
-    }
-
-    const group = card.querySelector('.bp-search-widget__filter-choices');
-    if (group) {
-      group.replaceWith(this.renderFilterChoiceGroup(filter));
-    }
-  }
-
-  adjustFilterCounter(key, direction) {
-    const filter = this.getFilterByKey(key);
-    if (!filter || filter.type !== 'counter') {
-      return;
-    }
-
-    const currentValue = this.state.filters[key];
-    const nextValue = this.normalizeCounterValue(
-      filter,
-      currentValue + (filter.step * direction),
-      currentValue,
-    );
-
-    this.state.filters[key] = nextValue;
-    this.updateCounterDisplay(key);
-    this.syncSearchDisabledState();
-  }
-
-  commitCounterInput(key, input) {
-    const filter = this.getFilterByKey(key);
-    if (!filter || filter.type !== 'counter') {
-      return;
-    }
-
-    const currentValue = this.state.filters[key];
-    const nextValue = this.normalizeCounterValue(filter, input.value, currentValue);
-
-    this.state.filters[key] = nextValue;
-    this.updateCounterDisplay(key);
-    this.syncSearchDisabledState();
-  }
-
   resetFilters() {
     this.state.filters = this.buildFilterState(this.options.filters, {});
     this.render();
-  }
-
-  updateCounterDisplay(key) {
-    const filter = this.getFilterByKey(key);
-    const card = this.getFilterCardElement(key);
-    if (!filter || !card) {
-      return;
-    }
-
-    const currentValue = this.state.filters[key];
-    const input = card.querySelector('[data-role="filter-counter-input"]');
-    const decrementButton = card.querySelector('[data-action="decrement-filter-counter"]');
-    const incrementButton = card.querySelector('[data-action="increment-filter-counter"]');
-
-    if (input) {
-      input.value = String(currentValue);
-    }
-
-    if (decrementButton) {
-      decrementButton.disabled = currentValue <= filter.min;
-    }
-
-    if (incrementButton) {
-      incrementButton.disabled = currentValue >= filter.max;
-    }
   }
 
   handleSearch() {
@@ -1844,6 +2065,7 @@ class BPSearchWidget {
     }
 
     this.isDestroyed = true;
+    this.destroyUIInstances();
     this.closeChoicePopover();
     this.closeFilterPanel();
     this.destroyCalendar();

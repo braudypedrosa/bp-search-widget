@@ -47,6 +47,28 @@ function createRect({ top, left, width, height }) {
   };
 }
 
+function getSelectRoot(key, collection = 'fields') {
+  return document.querySelector(`[data-bp-search-widget-control="select"][data-collection="${collection}"][data-key="${key}"]`);
+}
+
+function openSelect(key, collection = 'fields') {
+  const root = getSelectRoot(key, collection);
+  root.querySelector('.bp-ui-select__trigger').click();
+  return document.body.querySelector('.bp-ui-select__popover');
+}
+
+function chooseOpenSelectOption(value) {
+  document.body.querySelector(`.bp-ui-select__popover .bp-ui-select__option[data-value="${value}"]`).click();
+}
+
+function getSelectPopover() {
+  return document.body.querySelector('.bp-ui-select__popover');
+}
+
+function getVisibleSelectPopover() {
+  return document.body.querySelector('.bp-ui-select__popover:not([hidden])');
+}
+
 afterEach(() => {
   document.body.innerHTML = '';
 });
@@ -347,14 +369,13 @@ describe('BPSearchWidget', () => {
     keywordInput.dispatchEvent(new Event('input', { bubbles: true }));
     expect(searchButton.disabled).toBe(true);
 
-    document.querySelector('[data-key="bp-view"]').click();
-    document.querySelector('[data-action="select-option"][data-key="bp-view"][data-value="Ocean"]').click();
+    widget.setSingleChoiceValue('bp-view', 'Ocean', 'filters');
     expect(searchButton.disabled).toBe(true);
 
-    document.querySelector('[data-action="toggle-filter-checkbox"][data-key="bp-amenities"][data-value="Pool"]').click();
+    widget.toggleCheckboxValue('bp-amenities', 'Pool', 'filters');
     expect(searchButton.disabled).toBe(true);
 
-    document.querySelector('[data-action="set-filter-radio"][data-key="bp-property"][data-value="Villa"]').click();
+    widget.setSingleChoiceValue('bp-property', 'Villa', 'filters');
     expect(searchButton.disabled).toBe(false);
 
     widget.destroy();
@@ -451,10 +472,9 @@ describe('BPSearchWidget', () => {
     keywordInput.value = 'oceanfront';
     keywordInput.dispatchEvent(new Event('input', { bubbles: true }));
 
-    document.querySelector('[data-key="bp-budget"]').click();
-    document.querySelector('[data-action="select-option"][data-key="bp-budget"][data-value="Under $200"]').click();
-    document.querySelector('[data-action="toggle-filter-checkbox"][data-key="bp-amenities"][data-value="Pool"]').click();
-    document.querySelector('[data-action="increment-filter-counter"]').click();
+    widget.setSingleChoiceValue('bp-budget', 'Under $200', 'filters');
+    widget.toggleCheckboxValue('bp-amenities', 'Pool', 'filters');
+    document.querySelector('.bp-ui-counter__button--increment').click();
 
     expect(document.querySelector('[data-action="search"]').disabled).toBe(false);
     expect(document.querySelector('[data-role="filter-badge"]').textContent).toBe('4');
@@ -463,9 +483,9 @@ describe('BPSearchWidget', () => {
 
     expect(document.querySelector('[data-role="filter-panel"]')).not.toBeNull();
     expect(document.querySelector('[data-role="filter-input"]').value).toBe('');
-    expect(document.querySelector('[data-filter-key="bp-budget"] .bp-search-widget__trigger-value').textContent).toBe('Select Budget');
-    expect(document.querySelectorAll('.bp-search-widget__filter-choice.is-selected')).toHaveLength(0);
-    expect(document.querySelector('[data-role="filter-counter-input"]').value).toBe('2');
+    expect(document.querySelector('[data-filter-key="bp-budget"] .bp-ui-select__trigger-value').textContent).toBe('Select Budget');
+    expect(document.querySelectorAll('.bp-ui-checkbox__option.is-selected')).toHaveLength(0);
+    expect(document.querySelector('.bp-ui-counter__input').value).toBe('2');
     expect(document.querySelector('[data-action="search"]').disabled).toBe(true);
     expect(document.querySelector('[data-role="filter-badge"]')).toBeNull();
 
@@ -485,11 +505,10 @@ describe('BPSearchWidget', () => {
     expect(document.querySelector('[data-role="filter-badge"]')).toBeNull();
 
     openFilters();
-    document.querySelector('[data-key="bp-budget"]').click();
-    document.querySelector('[data-action="select-option"][data-key="bp-budget"][data-value="Under $200"]').click();
+    widget.setSingleChoiceValue('bp-budget', 'Under $200', 'filters');
     expect(document.querySelector('[data-role="filter-badge"]').textContent).toBe('1');
 
-    document.querySelector('[data-action="toggle-filter-checkbox"][data-key="bp-amenities"][data-value="Pool"]').click();
+    widget.toggleCheckboxValue('bp-amenities', 'Pool', 'filters');
     expect(document.querySelector('[data-role="filter-badge"]').textContent).toBe('2');
 
     const keywordInput = document.querySelector('[data-role="filter-input"]');
@@ -497,7 +516,7 @@ describe('BPSearchWidget', () => {
     keywordInput.dispatchEvent(new Event('input', { bubbles: true }));
     expect(document.querySelector('[data-role="filter-badge"]').textContent).toBe('3');
 
-    document.querySelector('[data-action="increment-filter-counter"]').click();
+    document.querySelector('.bp-ui-counter__button--increment').click();
     expect(document.querySelector('[data-role="filter-badge"]').textContent).toBe('4');
 
     document.querySelector('[data-action="apply-filters"]').click();
@@ -515,17 +534,18 @@ describe('BPSearchWidget', () => {
       ],
     });
 
-    document.querySelector('[data-key="bp-guests"]').click();
-    expect(document.querySelector('.bp-search-widget__popover')).not.toBeNull();
+    openSelect('bp-guests');
+    expect(getVisibleSelectPopover()).not.toBeNull();
 
-    document.querySelector('[data-action="select-option"][data-key="bp-guests"][data-value="2"]').click();
-    expect(document.querySelector('.bp-search-widget__popover')).toBeNull();
-    expect(document.querySelector('[data-key="bp-guests"] .bp-search-widget__trigger-value').textContent).toBe('2');
+    chooseOpenSelectOption('2');
+    expect(getVisibleSelectPopover()).toBeNull();
+    expect(getSelectPopover()?.hasAttribute('hidden')).toBe(true);
+    expect(getSelectRoot('bp-guests').querySelector('.bp-ui-select__trigger-value').textContent).toBe('2');
 
     document.querySelector('[data-key="bp-pets"]').click();
     document.querySelector('[data-action="toggle-checkbox"][data-key="bp-pets"][data-value="Dog"]').click();
     expect(document.querySelector('.bp-search-widget__popover')).not.toBeNull();
-    expect(document.querySelector('[data-key="bp-pets"] .bp-search-widget__trigger-value').textContent).toBe('1 selected');
+    expect(document.querySelector('[data-field-key="bp-pets"] .bp-search-widget__trigger-value').textContent).toBe('1 selected');
 
     document.body.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     expect(document.querySelector('.bp-search-widget__popover')).toBeNull();
@@ -543,20 +563,20 @@ describe('BPSearchWidget', () => {
     });
 
     openFilters();
-    document.querySelector('[data-key="bp-view"]').click();
-    expect(document.querySelector('.bp-search-widget__popover')).not.toBeNull();
-    expect(document.querySelector('[data-role="filter-dialog"] > .bp-search-widget__popover--floating')).not.toBeNull();
-    expect(document.querySelector('[data-filter-popover-key="bp-view"] .bp-search-widget__popover')).toBeNull();
+    openSelect('bp-view', 'filters');
+    expect(getVisibleSelectPopover()).not.toBeNull();
+    expect(getSelectPopover().parentElement).toBe(document.body);
 
-    document.querySelector('[data-action="select-option"][data-key="bp-view"][data-value="Garden"]').click();
+    chooseOpenSelectOption('Garden');
 
-    expect(document.querySelector('.bp-search-widget__popover')).toBeNull();
-    expect(document.querySelector('[data-filter-key="bp-view"] .bp-search-widget__trigger-value').textContent).toBe('Garden');
+    expect(getVisibleSelectPopover()).toBeNull();
+    expect(getSelectPopover()?.hasAttribute('hidden')).toBe(true);
+    expect(getSelectRoot('bp-view', 'filters').querySelector('.bp-ui-select__trigger-value').textContent).toBe('Garden');
 
     widget.destroy();
   });
 
-  it('closes floating filter select popovers when the modal body scrolls', () => {
+  it('keeps filter select popovers open when the modal body scrolls and reuses the shared select behavior', () => {
     const widget = createWidget({
       filters: [
         { label: 'View', type: 'select', options: ['Ocean', 'Garden'] },
@@ -565,30 +585,26 @@ describe('BPSearchWidget', () => {
     });
 
     openFilters();
-    document.querySelector('[data-key="bp-budget"]').click();
-    expect(document.querySelector('.bp-search-widget__popover--floating')).not.toBeNull();
+    openSelect('bp-budget', 'filters');
+    expect(getVisibleSelectPopover()).not.toBeNull();
 
     document.querySelector('[data-role="filter-layout"]').dispatchEvent(new Event('scroll'));
-    expect(document.querySelector('.bp-search-widget__popover')).toBeNull();
+    expect(getVisibleSelectPopover()).not.toBeNull();
 
     widget.destroy();
   });
 
-  it('opens floating filter select popovers upward when there is not enough room below', () => {
+  it('uses the shared select popover positioning when there is not enough room below', () => {
     const widget = createWidget({
       filters: [{ label: 'Budget', type: 'select', options: ['Under $200', '$200-$500', '$500+'] }],
     });
     const originalGetBoundingClientRect = HTMLElement.prototype.getBoundingClientRect;
     const rectSpy = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function mockRect() {
-      if (this.matches?.('[data-role="filter-dialog"]')) {
-        return createRect({ top: 40, left: 0, width: 360, height: 600 });
-      }
-
-      if (this.matches?.('[data-filter-popover-key="bp-budget"]')) {
+      if (this.classList?.contains('bp-ui-select__trigger')) {
         return createRect({ top: 520, left: 24, width: 280, height: 52 });
       }
 
-      if (this.classList?.contains('bp-search-widget__popover')) {
+      if (this.classList?.contains('bp-ui-select__popover')) {
         return createRect({ top: 0, left: 0, width: 280, height: 180 });
       }
 
@@ -597,13 +613,13 @@ describe('BPSearchWidget', () => {
     const innerHeightSpy = vi.spyOn(window, 'innerHeight', 'get').mockReturnValue(640);
 
     openFilters();
-    document.querySelector('[data-key="bp-budget"]').click();
+    openSelect('bp-budget', 'filters');
 
-    const popover = document.querySelector('.bp-search-widget__popover--floating');
+    const popover = getVisibleSelectPopover();
 
     expect(popover).not.toBeNull();
-    expect(popover.classList.contains('bp-search-widget__popover--above')).toBe(true);
-    expect(Number.parseInt(popover.style.top, 10)).toBe(292);
+    expect(getSelectRoot('bp-budget', 'filters').classList.contains('bp-ui-select--above')).toBe(true);
+    expect(Number.parseInt(popover.style.top, 10)).toBe(332);
 
     innerHeightSpy.mockRestore();
     rectSpy.mockRestore();
@@ -661,9 +677,9 @@ describe('BPSearchWidget', () => {
 
     openFilters();
 
-    const input = document.querySelector('[data-role="filter-counter-input"]');
-    const decrementButton = document.querySelector('[data-action="decrement-filter-counter"]');
-    const incrementButton = document.querySelector('[data-action="increment-filter-counter"]');
+    const input = document.querySelector('.bp-ui-counter__input');
+    const decrementButton = document.querySelector('.bp-ui-counter__button--decrement');
+    const incrementButton = document.querySelector('.bp-ui-counter__button--increment');
 
     expect(input.value).toBe('2');
 
@@ -679,10 +695,12 @@ describe('BPSearchWidget', () => {
 
     input.value = '5';
     input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.dispatchEvent(new FocusEvent('blur', { bubbles: true }));
     expect(input.value).toBe('6');
 
     input.value = '100';
     input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.dispatchEvent(new FocusEvent('blur', { bubbles: true }));
     expect(input.value).toBe('6');
 
     widget.destroy();
@@ -721,12 +739,12 @@ describe('BPSearchWidget', () => {
     });
 
     openFilters();
-    document.querySelector('[data-key="bp-view"]').click();
-    expect(document.querySelector('.bp-search-widget__popover')).not.toBeNull();
+    openSelect('bp-view', 'filters');
+    expect(getVisibleSelectPopover()).not.toBeNull();
 
     document.querySelector('[data-role="filter-backdrop"]').click();
     expect(document.querySelector('[data-role="filter-panel"]')).toBeNull();
-    expect(document.querySelector('.bp-search-widget__popover')).toBeNull();
+    expect(document.body.querySelector('.bp-ui-select__popover')).toBeNull();
     expect(document.body.style.overflow).toBe('');
 
     openFilters();

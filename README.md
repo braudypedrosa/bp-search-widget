@@ -20,7 +20,7 @@ A framework-agnostic vacation rental search widget powered by [`@braudypedrosa/b
 ## Installation
 
 ```bash
-npm install @braudypedrosa/bp-search-widget @braudypedrosa/bp-calendar @fortawesome/fontawesome-free
+npm install @braudypedrosa/bp-search-widget @fortawesome/fontawesome-free
 ```
 
 ## Usage
@@ -29,7 +29,6 @@ npm install @braudypedrosa/bp-search-widget @braudypedrosa/bp-calendar @fortawes
 import { BPSearchWidget } from '@braudypedrosa/bp-search-widget';
 import '@fortawesome/fontawesome-free/css/all.min.css';
 import '@braudypedrosa/bp-search-widget/styles';
-import '@braudypedrosa/bp-calendar/styles';
 
 const widget = new BPSearchWidget('#widget', {
   fields: [
@@ -59,6 +58,8 @@ The visible date UI is a single combined field, but the widget output always exp
 
 The widget uses Font Awesome class names for its built-in icons and inline `fields`, so import `@fortawesome/fontawesome-free/css/all.min.css` once in your app before rendering the widget.
 
+`@braudypedrosa/bp-search-widget/styles` is self-contained and already includes the internal `bp-calendar` and shared `bp-ui-components` styles used by the widget.
+
 ## Browser Global
 
 The module also registers globals on `window`:
@@ -72,7 +73,6 @@ Example:
 <div id="widget"></div>
 <script type="module">
   import '@fortawesome/fontawesome-free/css/all.min.css';
-  import '@braudypedrosa/bp-calendar/styles';
   import '@braudypedrosa/bp-search-widget/styles';
   import '@braudypedrosa/bp-search-widget';
 
