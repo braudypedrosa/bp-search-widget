@@ -19,8 +19,40 @@
     padding: 0;
     border: 0;
     background: none;
+    outline: none;
+    box-shadow: none;
+    transition: none;
     -webkit-appearance: none;
     appearance: none;
+
+    &:hover,
+    &:focus,
+    &:focus-visible,
+    &:active {
+      border: 0;
+      background: none;
+      outline: none;
+      box-shadow: none;
+      color: inherit;
+      text-decoration: none;
+    }
+  }
+
+  a {
+    color: inherit;
+    text-decoration: none;
+
+    &:hover,
+    &:focus,
+    &:active {
+      color: inherit;
+      text-decoration: none;
+    }
+  }
+
+  label {
+    display: revert;
+    line-height: inherit;
   }
 
   img {
