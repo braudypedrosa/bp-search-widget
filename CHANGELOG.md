@@ -1,16 +1,14 @@
 # Changelog
 
-All notable changes to this project are documented in this file.
+## 1.0.0
 
-## [1.1.0] - 2026-03-04
+Initial public release of `bp-search-widget`.
 
-### Added
-- Added a self-contained compiled `./styles` export that bundles the shared `bp-ui-components` styles and embedded `bp-calendar` datepicker styles.
-- Added CI workflow coverage for test and CSS build verification.
+### Included
 
-### Changed
-- Replaced custom filter counter behavior with `BPUICounter`.
-- Replaced search/select dropdown implementations with `BPUISelect`.
-- Replaced modal checkbox and radio filter groups with shared `bp-ui-components` controls.
-- Removed duplicated inline reset styles and now apply `.bp-widget-reset` at the widget root.
-- Upgraded the local tooling baseline to Vite 7, Vitest 4, jsdom 28, and `sass-embedded` 1.97.3.
+- booking-style search bar with destination and date fields
+- inline custom fields for input, select, checkbox, and radio use cases
+- modal filters with input, select, checkbox, radio, and counter controls
+- built-in active-filter badge and reset/apply filter actions
+- datepicker integration powered by `bp-calendar`
+- runtime APIs for adding, removing, and updating fields and filters

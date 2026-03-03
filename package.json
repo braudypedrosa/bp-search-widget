@@ -1,18 +1,18 @@
 {
   "name": "@braudypedrosa/bp-search-widget",
-  "version": "1.1.0",
+  "version": "1.0.0",
   "description": "Framework-agnostic vacation rental search widget powered by bp-calendar",
   "type": "module",
-  "main": "./bp-search-widget.js",
-  "module": "./bp-search-widget.js",
+  "main": "./dist/bp-search-widget.min.js",
+  "module": "./dist/bp-search-widget.min.js",
   "exports": {
-    ".": "./bp-search-widget.js",
+    ".": "./dist/bp-search-widget.min.js",
     "./styles": "./dist/bp-search-widget.css"
   },
   "files": [
-    "bp-search-widget.js",
-    "dist/bp-search-widget.css",
-    "bp-search-widget.scss",
+    "dist",
+    "src",
+    "demo",
     "README.md",
     "LICENSE"
   ],
@@ -32,22 +32,14 @@
     "url": "https://github.com/braudypedrosa/bp-search-widget/issues"
   },
   "homepage": "https://github.com/braudypedrosa/bp-search-widget#readme",
-  "publishConfig": {
-    "access": "public"
-  },
   "scripts": {
-    "build:css": "node ./scripts/build-css.mjs",
-    "dev": "vite",
+    "build": "vite build",
+    "dev": "vite dev --open demo/index.html",
     "test": "vitest run",
-    "release": "npm run build:css && bash ./scripts/release.sh",
-    "release:patch": "npm run build:css && bash ./scripts/release.sh patch",
-    "release:minor": "npm run build:css && bash ./scripts/release.sh minor",
-    "release:major": "npm run build:css && bash ./scripts/release.sh major",
-    "release:npm": "npm publish"
+    "test:watch": "vitest"
   },
   "dependencies": {
-    "@braudypedrosa/bp-calendar": "^1.0.5",
-    "@braudypedrosa/bp-ui-components": "^0.3.0"
+    "@braudypedrosa/bp-calendar": "^1.0.5"
   },
   "peerDependencies": {
     "@fortawesome/fontawesome-free": ">=6.0.0"
