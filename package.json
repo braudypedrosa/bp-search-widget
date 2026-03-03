@@ -1,6 +1,6 @@
 {
   "name": "@braudypedrosa/bp-search-widget",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Framework-agnostic vacation rental search widget powered by bp-calendar",
   "type": "module",
   "main": "./bp-search-widget.js",
