@@ -5,6 +5,8 @@ const MAIN_FIELD_TYPES = new Set(['input', 'select', 'checkbox', 'radio']);
 const FILTER_FIELD_TYPES = new Set(['input', 'select', 'checkbox', 'radio', 'counter']);
 const CHOICE_FIELD_TYPES = new Set(['select', 'checkbox', 'radio']);
 const ALLOWED_POSITIONS = new Set(['start', 'end']);
+const FILTER_DISPLAY_MODES = new Set(['modal', 'left-slide']);
+const FILTER_MOBILE_FALLBACK_BREAKPOINT = 640;
 const CALENDAR_OPTION_KEYS = [
   'startDate',
   'monthsToShow',
@@ -40,6 +42,7 @@ class BPSearchWidget {
     this.boundHandleDocumentClick = this.handleDocumentClick.bind(this);
     this.boundHandleDocumentKeydown = this.handleDocumentKeydown.bind(this);
     this.boundHandleFilterLayoutScroll = this.handleFilterLayoutScroll.bind(this);
+    this.boundHandleWindowResize = this.handleWindowResize.bind(this);
     this.lockedBodyOverflow = '';
 
     this.state = {
@@ -61,13 +64,17 @@ class BPSearchWidget {
   normalizeOptions(options) {
     const normalizedFields = this.normalizeFields(options.fields || []);
     const normalizedFilters = this.normalizeFilters(options.filters || []);
+    const filterDisplayMode = this.normalizeFilterDisplayMode(options.filterDisplayMode);
 
     this.assertUniqueCollectionKeys(normalizedFields, normalizedFilters);
-    this.validateFilterWidths(normalizedFilters);
+    if (this.shouldValidateFilterWidths(filterDisplayMode)) {
+      this.validateFilterWidths(normalizedFilters);
+    }
 
     return {
       showLocation: options.showLocation !== false,
       showFilterButton: options.showFilterButton !== false,
+      filterDisplayMode,
       locationLabel: typeof options.locationLabel === 'string' && options.locationLabel.trim()
         ? options.locationLabel.trim()
         : 'Location',
@@ -86,6 +93,18 @@ class BPSearchWidget {
       onSearch: typeof options.onSearch === 'function' ? options.onSearch : null,
       onFilterClick: typeof options.onFilterClick === 'function' ? options.onFilterClick : null,
     };
+  }
+
+  normalizeFilterDisplayMode(mode) {
+    if (mode === undefined || mode === null || mode === '') {
+      return 'modal';
+    }
+
+    if (!FILTER_DISPLAY_MODES.has(mode)) {
+      throw new Error(`Unsupported filter display mode: ${mode}`);
+    }
+
+    return mode;
   }
 
   normalizeCalendarOptions(calendarOptions) {
@@ -212,7 +231,7 @@ class BPSearchWidget {
 
     const key = typeof field.key === 'string' && field.key.trim()
       ? field.key.trim()
-      : `bp-${this.slugifyLabel(label)}`;
+      : this.slugifyLabel(label);
 
     return {
       label,
@@ -441,6 +460,9 @@ class BPSearchWidget {
     this.container.addEventListener('keydown', this.boundHandleContainerKeydown);
     document.addEventListener('click', this.boundHandleDocumentClick);
     document.addEventListener('keydown', this.boundHandleDocumentKeydown);
+    if (typeof window !== 'undefined') {
+      window.addEventListener('resize', this.boundHandleWindowResize);
+    }
   }
 
   detachEventListeners() {
@@ -451,6 +473,9 @@ class BPSearchWidget {
     this.container.removeEventListener('keydown', this.boundHandleContainerKeydown);
     document.removeEventListener('click', this.boundHandleDocumentClick);
     document.removeEventListener('keydown', this.boundHandleDocumentKeydown);
+    if (typeof window !== 'undefined') {
+      window.removeEventListener('resize', this.boundHandleWindowResize);
+    }
   }
 
   render() {
@@ -662,13 +687,23 @@ class BPSearchWidget {
   }
 
   renderFilterPanel() {
+    if (this.shouldUseModalFilterPanelPresentation()) {
+      return this.renderModalFilterPanel();
+    }
+
+    return this.renderLeftSlideFilterPanel();
+  }
+
+  renderModalFilterPanel() {
     const panel = this.createElement('div', 'bp-search-widget__filter-panel');
     const backdrop = this.createElement('button', 'bp-search-widget__filter-backdrop');
     const dialog = this.createElement('div', 'bp-search-widget__filter-dialog');
     const header = this.createElement('div', 'bp-search-widget__filter-header');
     const title = this.createElement('h2', 'bp-search-widget__filter-title', 'Filters');
     const closeButton = this.createElement('button', 'bp-search-widget__filter-close');
+    const layoutWrap = this.createElement('div', 'bp-search-widget__filter-layout-wrap');
     const layout = this.createElement('div', 'bp-search-widget__filter-layout');
+    const { track: scrollbar, thumb: scrollbarThumb } = this.createFilterScrollbar();
     const footer = this.createElement('div', 'bp-search-widget__filter-footer');
     const resetButton = this.createElement('button', 'bp-search-widget__filter-reset', 'Reset');
     const applyButton = this.createElement('button', 'bp-search-widget__filter-apply', 'Apply');
@@ -683,6 +718,7 @@ class BPSearchWidget {
     dialog.setAttribute('role', 'dialog');
     dialog.setAttribute('aria-modal', 'true');
     dialog.setAttribute('aria-label', 'Filters');
+    layoutWrap.setAttribute('data-role', 'filter-layout-wrap');
     layout.setAttribute('data-role', 'filter-layout');
     closeButton.type = 'button';
     closeButton.setAttribute('data-action', 'close-filter-panel');
@@ -710,16 +746,103 @@ class BPSearchWidget {
     });
 
     dialog.appendChild(header);
-    dialog.appendChild(layout);
+    layoutWrap.appendChild(layout);
+    layoutWrap.appendChild(scrollbar);
+    dialog.appendChild(layoutWrap);
     dialog.appendChild(footer);
     panel.appendChild(backdrop);
     panel.appendChild(dialog);
     this.elements.filterDialog = dialog;
+    this.elements.filterLayoutWrap = layoutWrap;
     this.elements.filterLayout = layout;
+    this.elements.filterScrollbar = scrollbar;
+    this.elements.filterScrollbarThumb = scrollbarThumb;
     this.elements.filterResetButton = resetButton;
     this.elements.filterApplyButton = applyButton;
     this.elements.filterCloseButton = closeButton;
     return panel;
+  }
+
+  renderLeftSlideFilterPanel() {
+    const panel = this.createElement('div', 'bp-search-widget__filter-panel bp-search-widget__filter-panel--left-slide');
+    const backdrop = this.createElement('button', 'bp-search-widget__filter-backdrop bp-search-widget__filter-backdrop--left-slide');
+    const dialog = this.createElement('div', 'bp-search-widget__filter-dialog bp-search-widget__filter-dialog--left-slide');
+    const header = this.createElement('div', 'bp-search-widget__filter-header');
+    const title = this.createElement('h2', 'bp-search-widget__filter-title', 'Filters');
+    const closeButton = this.createElement('button', 'bp-search-widget__filter-close');
+    const layoutWrap = this.createElement('div', 'bp-search-widget__filter-layout-wrap bp-search-widget__filter-layout-wrap--stacked');
+    const layout = this.createElement('div', 'bp-search-widget__filter-layout bp-search-widget__filter-layout--stacked');
+    const { track: scrollbar, thumb: scrollbarThumb } = this.createFilterScrollbar();
+    const footer = this.createElement('div', 'bp-search-widget__filter-footer');
+    const resetButton = this.createElement('button', 'bp-search-widget__filter-reset', 'Reset');
+    const applyButton = this.createElement('button', 'bp-search-widget__filter-apply', 'Apply');
+    const rows = this.getFilterRows({ stacked: true });
+
+    panel.setAttribute('data-role', 'filter-panel');
+    panel.setAttribute('data-filter-display-mode', 'left-slide');
+    backdrop.type = 'button';
+    backdrop.setAttribute('data-action', 'close-filter-panel');
+    backdrop.setAttribute('data-role', 'filter-backdrop');
+    backdrop.setAttribute('aria-label', 'Close filters');
+    dialog.setAttribute('data-role', 'filter-dialog');
+    dialog.setAttribute('role', 'dialog');
+    dialog.setAttribute('aria-modal', 'true');
+    dialog.setAttribute('aria-label', 'Filters');
+    layoutWrap.setAttribute('data-role', 'filter-layout-wrap');
+    layout.setAttribute('data-role', 'filter-layout');
+    closeButton.type = 'button';
+    closeButton.setAttribute('data-action', 'close-filter-panel');
+    closeButton.setAttribute('aria-label', 'Close filters');
+    closeButton.innerHTML = this.getCloseIcon();
+    resetButton.type = 'button';
+    resetButton.setAttribute('data-action', 'reset-filters');
+    applyButton.type = 'button';
+    applyButton.setAttribute('data-action', 'apply-filters');
+    layout.addEventListener('scroll', this.boundHandleFilterLayoutScroll);
+    header.appendChild(title);
+    header.appendChild(closeButton);
+    footer.appendChild(resetButton);
+    footer.appendChild(applyButton);
+
+    rows.forEach((row) => {
+      const rowElement = this.createElement('div', 'bp-search-widget__filter-row bp-search-widget__filter-row--stacked');
+
+      row.forEach(({ field, width }) => {
+        const card = this.renderFilterCard(field, width);
+        rowElement.appendChild(card);
+      });
+
+      layout.appendChild(rowElement);
+    });
+
+    dialog.appendChild(header);
+    layoutWrap.appendChild(layout);
+    layoutWrap.appendChild(scrollbar);
+    dialog.appendChild(layoutWrap);
+    dialog.appendChild(footer);
+    panel.appendChild(backdrop);
+    panel.appendChild(dialog);
+    this.elements.filterDialog = dialog;
+    this.elements.filterLayoutWrap = layoutWrap;
+    this.elements.filterLayout = layout;
+    this.elements.filterScrollbar = scrollbar;
+    this.elements.filterScrollbarThumb = scrollbarThumb;
+    this.elements.filterResetButton = resetButton;
+    this.elements.filterApplyButton = applyButton;
+    this.elements.filterCloseButton = closeButton;
+    return panel;
+  }
+
+  createFilterScrollbar() {
+    const track = this.createElement('div', 'bp-search-widget__filter-scrollbar');
+    const thumb = this.createElement('div', 'bp-search-widget__filter-scrollbar-thumb');
+
+    track.setAttribute('aria-hidden', 'true');
+    track.setAttribute('data-role', 'filter-scrollbar');
+    thumb.setAttribute('data-role', 'filter-scrollbar-thumb');
+    track.appendChild(thumb);
+
+    return { track, thumb };
   }
 
   renderFilterCard(field, width) {
@@ -893,8 +1016,15 @@ class BPSearchWidget {
     return '';
   }
 
-  getFilterRows() {
+  getFilterRows({ stacked = false } = {}) {
     const rows = [];
+
+    if (stacked) {
+      this.options.filters.forEach((field) => {
+        rows.push([{ field, width: 100 }]);
+      });
+      return rows;
+    }
 
     for (let index = 0; index < this.options.filters.length; index += 4) {
       const rowFields = this.options.filters.slice(index, index + 4);
@@ -1174,6 +1304,8 @@ class BPSearchWidget {
   }
 
   handleFilterLayoutScroll() {
+    this.syncFilterScrollbar();
+
     if (this.openPopover && this.openPopover.collection === 'filters') {
       this.closeChoicePopover();
     }
@@ -1184,6 +1316,14 @@ class BPSearchWidget {
       this.closeChoicePopover();
       this.closeFilterPanel();
     }
+  }
+
+  handleWindowResize() {
+    if (!this.isFilterPanelOpen) {
+      return;
+    }
+
+    this.syncFilterScrollbar();
   }
 
   handleFilterButtonClick() {
@@ -1350,6 +1490,11 @@ class BPSearchWidget {
     if (this.elements.filterCloseButton) {
       this.elements.filterCloseButton.focus();
     }
+
+    this.syncFilterScrollbar();
+    if (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function') {
+      window.requestAnimationFrame(() => this.syncFilterScrollbar());
+    }
   }
 
   closeFilterPanel() {
@@ -1365,7 +1510,10 @@ class BPSearchWidget {
     }
 
     this.elements.filterDialog = null;
+    this.elements.filterLayoutWrap = null;
     this.elements.filterLayout = null;
+    this.elements.filterScrollbar = null;
+    this.elements.filterScrollbarThumb = null;
     this.elements.filterResetButton = null;
     this.elements.filterApplyButton = null;
     this.elements.filterCloseButton = null;
@@ -1733,7 +1881,9 @@ class BPSearchWidget {
     }
 
     const nextFilters = [...this.options.filters, normalizedFilter];
-    this.validateFilterWidths(nextFilters);
+    if (this.shouldValidateFilterWidths()) {
+      this.validateFilterWidths(nextFilters);
+    }
 
     this.options.filters = nextFilters;
     this.state.filters[normalizedFilter.key] = this.coerceFilterValue(normalizedFilter, undefined);
@@ -1808,7 +1958,9 @@ class BPSearchWidget {
     });
     const nextFilters = this.options.filters.map((field) => (field.key === key ? mergedFilter : field));
 
-    this.validateFilterWidths(nextFilters);
+    if (this.shouldValidateFilterWidths()) {
+      this.validateFilterWidths(nextFilters);
+    }
     this.options.filters = this.normalizeFilters(nextFilters);
     this.assertUniqueCollectionKeys(this.options.fields, this.options.filters);
     this.state.filters[key] = this.coerceFilterValue(mergedFilter, this.state.filters[key]);
@@ -1968,6 +2120,72 @@ class BPSearchWidget {
   getFilterCardElement(key) {
     return Array.from(this.container.querySelectorAll('[data-filter-key]'))
       .find((element) => element.getAttribute('data-filter-key') === key) || null;
+  }
+
+  syncFilterScrollbar() {
+    const layout = this.elements.filterLayout;
+    const track = this.elements.filterScrollbar;
+    const thumb = this.elements.filterScrollbarThumb;
+
+    if (!layout || !track || !thumb) {
+      return;
+    }
+
+    const scrollHeight = layout.scrollHeight;
+    const clientHeight = layout.clientHeight;
+    const overflow = scrollHeight - clientHeight;
+
+    if (overflow <= 1) {
+      track.classList.add('is-hidden');
+      thumb.style.height = '';
+      thumb.style.transform = 'translateY(0px)';
+      return;
+    }
+
+    const trackStyles = window.getComputedStyle(track);
+    const trackPaddingTop = Number.parseFloat(trackStyles.paddingTop) || 0;
+    const trackPaddingBottom = Number.parseFloat(trackStyles.paddingBottom) || 0;
+    const usableTrackHeight = track.clientHeight - trackPaddingTop - trackPaddingBottom;
+
+    if (usableTrackHeight <= 0) {
+      return;
+    }
+
+    const minThumbHeight = 64;
+    const rawThumbHeight = Math.round((clientHeight / scrollHeight) * usableTrackHeight);
+    const thumbHeight = Math.min(usableTrackHeight, Math.max(minThumbHeight, rawThumbHeight));
+    const maxThumbTop = Math.max(0, usableTrackHeight - thumbHeight);
+    const thumbTop = maxThumbTop === 0
+      ? 0
+      : Math.round((layout.scrollTop / overflow) * maxThumbTop);
+
+    track.classList.remove('is-hidden');
+    thumb.style.height = `${thumbHeight}px`;
+    thumb.style.transform = `translateY(${thumbTop}px)`;
+  }
+
+  shouldValidateFilterWidths(filterDisplayMode = this.options.filterDisplayMode) {
+    return filterDisplayMode === 'modal';
+  }
+
+  shouldUseModalFilterPanelPresentation() {
+    if (this.options.filterDisplayMode === 'modal') {
+      return true;
+    }
+
+    return this.isFilterMobileFallbackViewport();
+  }
+
+  isFilterMobileFallbackViewport() {
+    if (this.options.filterDisplayMode !== 'left-slide') {
+      return false;
+    }
+
+    if (typeof window === 'undefined') {
+      return false;
+    }
+
+    return window.innerWidth <= FILTER_MOBILE_FALLBACK_BREAKPOINT;
   }
 }
 

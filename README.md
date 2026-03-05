@@ -2,14 +2,14 @@
 
 A framework-agnostic vacation rental search widget for stay searches, powered by `@braudypedrosa/bp-calendar`.
 
-It combines destination, dates, inline fields, and optional filters into a single booking-style search bar with a polished modal filter experience.
+It combines destination, dates, inline fields, and optional filters into a single booking-style search bar with flexible filter panel display modes.
 
 ## Highlights
 
 - compact pill-style search bar
 - integrated datepicker powered by `bp-calendar`
 - built-in `select`, `checkbox`, `radio`, and `counter` fields
-- optional filter modal with reset and apply actions
+- optional filter panel with reset and apply actions (`modal` or `left-slide`)
 - active-filter badge on the filter button
 - runtime field and filter updates through the public API
 
@@ -61,6 +61,7 @@ The package also registers:
 
 - `showLocation: boolean` default `true`
 - `showFilterButton: boolean` default `true`
+- `filterDisplayMode: 'modal' | 'left-slide'` default `'modal'`
 - `locationLabel: string` default `'Location'`
 - `locationPlaceholder: string` default `'Where are you going?'`
 - `dateLabel: string` default `'Dates'`
@@ -70,6 +71,13 @@ The package also registers:
 - `calendarOptions: WidgetCalendarOptions` default `{ datepickerPlacement: 'auto' }`
 - `onSearch: (payload, instance) => void`
 - `onFilterClick: (payload, instance) => void`
+
+Filter display mode notes:
+
+- `modal` preserves the existing centered dialog behavior.
+- `left-slide` opens a left-anchored slide panel and stacks filters top-to-bottom.
+- when `filterDisplayMode` is `left-slide` and viewport width is `<= 640px`, the widget falls back to modal presentation.
+- filter `width` values are ignored in `left-slide` mode (stacked layout).
 
 ## FieldDescriptor
 
@@ -90,7 +98,7 @@ Notes:
 - `options` is required for `select`, `checkbox`, and `radio`
 - `position` defaults to `'end'`
 - `required` defaults to `false`
-- `key` defaults to `bp-${slugify(label)}`
+- `key` defaults to `slugify(label)`
 - `icon` accepts a Font Awesome class string
 
 ## FilterDescriptor

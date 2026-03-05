@@ -86,8 +86,8 @@ describe('BPSearchWidget', () => {
       filters: [{ label: 'Stay Length', type: 'counter' }],
     });
 
-    expect(widget.options.fields[0].key).toBe('bp-promo-code');
-    expect(widget.options.filters[0].key).toBe('bp-stay-length');
+    expect(widget.options.fields[0].key).toBe('promo-code');
+    expect(widget.options.filters[0].key).toBe('stay-length');
     widget.destroy();
   });
 
@@ -116,9 +116,29 @@ describe('BPSearchWidget', () => {
     })).toThrow(/icon is only supported on fields/);
 
     expect(() => createWidget({
-      fields: [{ label: 'Guests', type: 'input', key: 'bp-shared' }],
-      filters: [{ label: 'Adults', type: 'counter', key: 'bp-shared' }],
+      fields: [{ label: 'Guests', type: 'input', key: 'shared' }],
+      filters: [{ label: 'Adults', type: 'counter', key: 'shared' }],
     })).toThrow(/Duplicate key across fields and filters/);
+
+    expect(() => createWidget({
+      filterDisplayMode: 'right-slide',
+    })).toThrow(/Unsupported filter display mode/);
+  });
+
+  it('supports modal and left-slide filter display modes', () => {
+    const modalWidget = createWidget({
+      filterDisplayMode: 'modal',
+      filters: [{ label: 'Bedrooms', type: 'counter', min: 1, defaultValue: 1 }],
+    });
+    expect(modalWidget.options.filterDisplayMode).toBe('modal');
+    modalWidget.destroy();
+
+    const leftSlideWidget = createWidget({
+      filterDisplayMode: 'left-slide',
+      filters: [{ label: 'Bedrooms', type: 'counter', min: 1, defaultValue: 1 }],
+    });
+    expect(leftSlideWidget.options.filterDisplayMode).toBe('left-slide');
+    leftSlideWidget.destroy();
   });
 
   it('rejects filter rows that exceed 100 percent width', () => {
@@ -128,6 +148,19 @@ describe('BPSearchWidget', () => {
         { label: 'Two', type: 'input', width: '50%' },
       ],
     })).toThrow(/exceed 100%/);
+  });
+
+  it('does not validate cumulative filter widths in left-slide mode', () => {
+    const widget = createWidget({
+      filterDisplayMode: 'left-slide',
+      filters: [
+        { label: 'One', type: 'input', width: '60%' },
+        { label: 'Two', type: 'input', width: '50%' },
+      ],
+    });
+
+    expect(widget.options.filters).toHaveLength(2);
+    widget.destroy();
   });
 
   it('preserves declared order within start and end slots', () => {
@@ -155,8 +188,8 @@ describe('BPSearchWidget', () => {
       ],
     });
 
-    expect(document.querySelector('[data-field-key="bp-promo-code"] .bp-search-widget__icon .fa-ticket')).not.toBeNull();
-    expect(document.querySelector('[data-field-key="bp-guests"] .bp-search-widget__icon .fa-users')).not.toBeNull();
+    expect(document.querySelector('[data-field-key="promo-code"] .bp-search-widget__icon .fa-ticket')).not.toBeNull();
+    expect(document.querySelector('[data-field-key="guests"] .bp-search-widget__icon .fa-users')).not.toBeNull();
 
     widget.destroy();
   });
@@ -173,19 +206,19 @@ describe('BPSearchWidget', () => {
       .map((element) => element.textContent);
     expect(labelsAfterAdd).toEqual(['Promo Code', 'Guests', 'Pets']);
     expect(widget.getValues().customFields).toEqual({
-      'bp-guests': '',
-      'bp-promo-code': '',
-      'bp-pets': [],
+      'guests': '',
+      'promo-code': '',
+      'pets': [],
     });
 
-    widget.removeField('bp-guests');
+    widget.removeField('guests');
 
     const labelsAfterRemove = Array.from(document.querySelectorAll('.bp-search-widget__section--custom .bp-search-widget__label'))
       .map((element) => element.textContent);
     expect(labelsAfterRemove).toEqual(['Promo Code', 'Pets']);
     expect(widget.getValues().customFields).toEqual({
-      'bp-promo-code': '',
-      'bp-pets': [],
+      'promo-code': '',
+      'pets': [],
     });
 
     widget.destroy();
@@ -197,22 +230,22 @@ describe('BPSearchWidget', () => {
     });
 
     widget.addFilter({ label: 'View', type: 'select', options: ['Ocean', 'Garden'], width: '30%' });
-    widget.updateFilter('bp-view', { label: 'Scenery', options: ['Ocean', 'Garden', 'City'] });
+    widget.updateFilter('view', { label: 'Scenery', options: ['Ocean', 'Garden', 'City'] });
 
     expect(widget.options.filters.map((field) => field.label)).toEqual(['Bedrooms', 'Scenery']);
     expect(widget.getValues().filters).toEqual({
-      'bp-bedrooms': 2,
-      'bp-view': '',
+      'bedrooms': 2,
+      'view': '',
     });
 
-    widget.removeFilter('bp-view');
+    widget.removeFilter('view');
 
     expect(widget.options.filters.map((field) => field.label)).toEqual(['Bedrooms']);
     expect(widget.getValues().filters).toEqual({
-      'bp-bedrooms': 2,
+      'bedrooms': 2,
     });
 
-    expect(() => widget.updateFilter('bp-bedrooms', { key: 'bp-adults' })).toThrow(/immutable/);
+    expect(() => widget.updateFilter('bedrooms', { key: 'adults' })).toThrow(/immutable/);
     widget.destroy();
   });
 
@@ -232,9 +265,9 @@ describe('BPSearchWidget', () => {
     document.querySelector('[data-role="location-input"]').dispatchEvent(new Event('input', { bubbles: true }));
     document.querySelector('[data-role="custom-input"]').value = 'SAVE10';
     document.querySelector('[data-role="custom-input"]').dispatchEvent(new Event('input', { bubbles: true }));
-    widget.setSingleChoiceValue('bp-guests', '2');
+    widget.setSingleChoiceValue('guests', '2');
     openFilters();
-    widget.setSingleChoiceValue('bp-view', 'Ocean', 'filters');
+    widget.setSingleChoiceValue('view', 'Ocean', 'filters');
     selectDateRange(widget, '2030-01-10', '2030-01-14');
 
     expect(widget.getValues()).toEqual({
@@ -242,12 +275,12 @@ describe('BPSearchWidget', () => {
       checkIn: '2030-01-10',
       checkOut: '2030-01-14',
       customFields: {
-        'bp-promo-code': 'SAVE10',
-        'bp-guests': '2',
+        'promo-code': 'SAVE10',
+        'guests': '2',
       },
       filters: {
-        'bp-bedrooms': 2,
-        'bp-view': 'Ocean',
+        'bedrooms': 2,
+        'view': 'Ocean',
       },
     });
 
@@ -302,10 +335,10 @@ describe('BPSearchWidget', () => {
     promoInput.dispatchEvent(new Event('input', { bubbles: true }));
     expect(searchButton.disabled).toBe(true);
 
-    widget.setSingleChoiceValue('bp-guests', '2');
+    widget.setSingleChoiceValue('guests', '2');
     expect(searchButton.disabled).toBe(true);
 
-    widget.toggleCheckboxValue('bp-pets', 'Dog');
+    widget.toggleCheckboxValue('pets', 'Dog');
     expect(searchButton.disabled).toBe(false);
 
     searchButton.click();
@@ -314,9 +347,9 @@ describe('BPSearchWidget', () => {
       checkIn: '2030-01-10',
       checkOut: '2030-01-12',
       customFields: {
-        'bp-promo-code': 'SAVE10',
-        'bp-guests': '2',
-        'bp-pets': ['Dog'],
+        'promo-code': 'SAVE10',
+        'guests': '2',
+        'pets': ['Dog'],
       },
       filters: {},
     }, widget);
@@ -347,14 +380,14 @@ describe('BPSearchWidget', () => {
     keywordInput.dispatchEvent(new Event('input', { bubbles: true }));
     expect(searchButton.disabled).toBe(true);
 
-    document.querySelector('[data-key="bp-view"]').click();
-    document.querySelector('[data-action="select-option"][data-key="bp-view"][data-value="Ocean"]').click();
+    document.querySelector('[data-key="view"]').click();
+    document.querySelector('[data-action="select-option"][data-key="view"][data-value="Ocean"]').click();
     expect(searchButton.disabled).toBe(true);
 
-    document.querySelector('[data-action="toggle-filter-checkbox"][data-key="bp-amenities"][data-value="Pool"]').click();
+    document.querySelector('[data-action="toggle-filter-checkbox"][data-key="amenities"][data-value="Pool"]').click();
     expect(searchButton.disabled).toBe(true);
 
-    document.querySelector('[data-action="set-filter-radio"][data-key="bp-property"][data-value="Villa"]').click();
+    document.querySelector('[data-action="set-filter-radio"][data-key="property"][data-value="Villa"]').click();
     expect(searchButton.disabled).toBe(false);
 
     widget.destroy();
@@ -387,7 +420,7 @@ describe('BPSearchWidget', () => {
 
     document.querySelector('[data-role="location-input"]').value = 'Sedona';
     document.querySelector('[data-role="location-input"]').dispatchEvent(new Event('input', { bubbles: true }));
-    widget.setSingleChoiceValue('bp-guests', '2');
+    widget.setSingleChoiceValue('guests', '2');
     selectDateRange(widget);
 
     const filterButton = document.querySelector('[data-action="filter"]');
@@ -401,10 +434,10 @@ describe('BPSearchWidget', () => {
       checkIn: '2030-01-10',
       checkOut: '2030-01-12',
       customFields: {
-        'bp-guests': '2',
+        'guests': '2',
       },
       filters: {
-        'bp-bedrooms': 2,
+        'bedrooms': 2,
       },
     }, widget);
 
@@ -412,6 +445,35 @@ describe('BPSearchWidget', () => {
     expect(document.querySelector('[data-role="filter-panel"]')).toBeNull();
     expect(document.body.style.overflow).toBe('');
     expect(onFilterClick).toHaveBeenCalledTimes(1);
+
+    widget.destroy();
+  });
+
+  it('opens the left-slide filter panel and keeps filters stacked top-to-bottom', () => {
+    const widget = createWidget({
+      filterDisplayMode: 'left-slide',
+      filters: [
+        { label: 'One', type: 'input', width: '30%' },
+        { label: 'Two', type: 'input', width: '30%' },
+        { label: 'Three', type: 'counter', min: 0, max: 5, defaultValue: 1 },
+      ],
+    });
+
+    openFilters();
+
+    const panel = document.querySelector('[data-role="filter-panel"]');
+    const dialog = document.querySelector('[data-role="filter-dialog"]');
+    const cards = Array.from(document.querySelectorAll('.bp-search-widget__filter-card'));
+
+    expect(panel.classList.contains('bp-search-widget__filter-panel--left-slide')).toBe(true);
+    expect(panel.getAttribute('data-filter-display-mode')).toBe('left-slide');
+    expect(dialog.classList.contains('bp-search-widget__filter-dialog--left-slide')).toBe(true);
+    expect(cards).toHaveLength(3);
+    expect(cards.every((card) => card.style.getPropertyValue('--bp-filter-width') === '100%')).toBe(true);
+
+    document.querySelector('[data-action="close-filter-panel"]').click();
+    expect(document.querySelector('[data-role="filter-panel"]')).toBeNull();
+    expect(document.body.style.overflow).toBe('');
 
     widget.destroy();
   });
@@ -451,9 +513,9 @@ describe('BPSearchWidget', () => {
     keywordInput.value = 'oceanfront';
     keywordInput.dispatchEvent(new Event('input', { bubbles: true }));
 
-    document.querySelector('[data-key="bp-budget"]').click();
-    document.querySelector('[data-action="select-option"][data-key="bp-budget"][data-value="Under $200"]').click();
-    document.querySelector('[data-action="toggle-filter-checkbox"][data-key="bp-amenities"][data-value="Pool"]').click();
+    document.querySelector('[data-key="budget"]').click();
+    document.querySelector('[data-action="select-option"][data-key="budget"][data-value="Under $200"]').click();
+    document.querySelector('[data-action="toggle-filter-checkbox"][data-key="amenities"][data-value="Pool"]').click();
     document.querySelector('[data-action="increment-filter-counter"]').click();
 
     expect(document.querySelector('[data-action="search"]').disabled).toBe(false);
@@ -463,7 +525,7 @@ describe('BPSearchWidget', () => {
 
     expect(document.querySelector('[data-role="filter-panel"]')).not.toBeNull();
     expect(document.querySelector('[data-role="filter-input"]').value).toBe('');
-    expect(document.querySelector('[data-filter-key="bp-budget"] .bp-search-widget__trigger-value').textContent).toBe('Select Budget');
+    expect(document.querySelector('[data-filter-key="budget"] .bp-search-widget__trigger-value').textContent).toBe('Select Budget');
     expect(document.querySelectorAll('.bp-search-widget__filter-choice.is-selected')).toHaveLength(0);
     expect(document.querySelector('[data-role="filter-counter-input"]').value).toBe('2');
     expect(document.querySelector('[data-action="search"]').disabled).toBe(true);
@@ -485,11 +547,11 @@ describe('BPSearchWidget', () => {
     expect(document.querySelector('[data-role="filter-badge"]')).toBeNull();
 
     openFilters();
-    document.querySelector('[data-key="bp-budget"]').click();
-    document.querySelector('[data-action="select-option"][data-key="bp-budget"][data-value="Under $200"]').click();
+    document.querySelector('[data-key="budget"]').click();
+    document.querySelector('[data-action="select-option"][data-key="budget"][data-value="Under $200"]').click();
     expect(document.querySelector('[data-role="filter-badge"]').textContent).toBe('1');
 
-    document.querySelector('[data-action="toggle-filter-checkbox"][data-key="bp-amenities"][data-value="Pool"]').click();
+    document.querySelector('[data-action="toggle-filter-checkbox"][data-key="amenities"][data-value="Pool"]').click();
     expect(document.querySelector('[data-role="filter-badge"]').textContent).toBe('2');
 
     const keywordInput = document.querySelector('[data-role="filter-input"]');
@@ -515,22 +577,22 @@ describe('BPSearchWidget', () => {
       ],
     });
 
-    document.querySelector('[data-key="bp-guests"]').click();
+    document.querySelector('[data-key="guests"]').click();
     expect(document.querySelector('.bp-search-widget__popover')).not.toBeNull();
 
-    document.querySelector('[data-action="select-option"][data-key="bp-guests"][data-value="2"]').click();
+    document.querySelector('[data-action="select-option"][data-key="guests"][data-value="2"]').click();
     expect(document.querySelector('.bp-search-widget__popover')).toBeNull();
-    expect(document.querySelector('[data-key="bp-guests"] .bp-search-widget__trigger-value').textContent).toBe('2');
+    expect(document.querySelector('[data-key="guests"] .bp-search-widget__trigger-value').textContent).toBe('2');
 
-    document.querySelector('[data-key="bp-pets"]').click();
-    document.querySelector('[data-action="toggle-checkbox"][data-key="bp-pets"][data-value="Dog"]').click();
+    document.querySelector('[data-key="pets"]').click();
+    document.querySelector('[data-action="toggle-checkbox"][data-key="pets"][data-value="Dog"]').click();
     expect(document.querySelector('.bp-search-widget__popover')).not.toBeNull();
-    expect(document.querySelector('[data-field-key="bp-pets"] .bp-search-widget__trigger-value').textContent).toBe('1 selected');
+    expect(document.querySelector('[data-field-key="pets"] .bp-search-widget__trigger-value').textContent).toBe('1 selected');
 
     document.body.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     expect(document.querySelector('.bp-search-widget__popover')).toBeNull();
 
-    document.querySelector('[data-key="bp-pets"]').click();
+    document.querySelector('[data-key="pets"]').click();
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     expect(document.querySelector('.bp-search-widget__popover')).toBeNull();
 
@@ -543,15 +605,32 @@ describe('BPSearchWidget', () => {
     });
 
     openFilters();
-    document.querySelector('[data-key="bp-view"]').click();
+    document.querySelector('[data-key="view"]').click();
     expect(document.querySelector('.bp-search-widget__popover')).not.toBeNull();
     expect(document.querySelector('[data-role="filter-dialog"] > .bp-search-widget__popover--floating')).not.toBeNull();
-    expect(document.querySelector('[data-filter-popover-key="bp-view"] .bp-search-widget__popover')).toBeNull();
+    expect(document.querySelector('[data-filter-popover-key="view"] .bp-search-widget__popover')).toBeNull();
 
-    document.querySelector('[data-action="select-option"][data-key="bp-view"][data-value="Garden"]').click();
+    document.querySelector('[data-action="select-option"][data-key="view"][data-value="Garden"]').click();
 
     expect(document.querySelector('.bp-search-widget__popover')).toBeNull();
-    expect(document.querySelector('[data-filter-key="bp-view"] .bp-search-widget__trigger-value').textContent).toBe('Garden');
+    expect(document.querySelector('[data-filter-key="view"] .bp-search-widget__trigger-value').textContent).toBe('Garden');
+
+    widget.destroy();
+  });
+
+  it('renders a custom filter scrollbar rail and thumb inside the panel', () => {
+    const widget = createWidget({
+      filters: [
+        { label: 'View', type: 'select', options: ['Ocean', 'Garden'] },
+        { label: 'Budget', type: 'select', options: ['Under $200', '$200-$500'] },
+      ],
+    });
+
+    openFilters();
+
+    expect(document.querySelector('[data-role="filter-layout-wrap"]')).not.toBeNull();
+    expect(document.querySelector('[data-role="filter-scrollbar"]')).not.toBeNull();
+    expect(document.querySelector('[data-role="filter-scrollbar-thumb"]')).not.toBeNull();
 
     widget.destroy();
   });
@@ -565,7 +644,7 @@ describe('BPSearchWidget', () => {
     });
 
     openFilters();
-    document.querySelector('[data-key="bp-budget"]').click();
+    document.querySelector('[data-key="budget"]').click();
     expect(document.querySelector('.bp-search-widget__popover--floating')).not.toBeNull();
 
     document.querySelector('[data-role="filter-layout"]').dispatchEvent(new Event('scroll'));
@@ -584,7 +663,7 @@ describe('BPSearchWidget', () => {
         return createRect({ top: 40, left: 0, width: 360, height: 600 });
       }
 
-      if (this.matches?.('[data-filter-popover-key="bp-budget"]')) {
+      if (this.matches?.('[data-filter-popover-key="budget"]')) {
         return createRect({ top: 520, left: 24, width: 280, height: 52 });
       }
 
@@ -597,7 +676,7 @@ describe('BPSearchWidget', () => {
     const innerHeightSpy = vi.spyOn(window, 'innerHeight', 'get').mockReturnValue(640);
 
     openFilters();
-    document.querySelector('[data-key="bp-budget"]').click();
+    document.querySelector('[data-key="budget"]').click();
 
     const popover = document.querySelector('.bp-search-widget__popover--floating');
 
@@ -625,6 +704,24 @@ describe('BPSearchWidget', () => {
 
     expect(document.querySelector('[data-role="filter-panel"]')).not.toBeNull();
     expect(popup.style.display).toBe('none');
+    widget.destroy();
+  });
+
+  it('falls back to modal presentation on mobile when mode is left-slide', () => {
+    const innerWidthSpy = vi.spyOn(window, 'innerWidth', 'get').mockReturnValue(640);
+    const widget = createWidget({
+      filterDisplayMode: 'left-slide',
+      filters: [{ label: 'View', type: 'select', options: ['Ocean', 'Garden'] }],
+    });
+
+    openFilters();
+
+    const panel = document.querySelector('[data-role="filter-panel"]');
+    const dialog = document.querySelector('[data-role="filter-dialog"]');
+    expect(panel.classList.contains('bp-search-widget__filter-panel--left-slide')).toBe(false);
+    expect(dialog.classList.contains('bp-search-widget__filter-dialog--left-slide')).toBe(false);
+
+    innerWidthSpy.mockRestore();
     widget.destroy();
   });
 
@@ -695,21 +792,21 @@ describe('BPSearchWidget', () => {
     const originalCalendar = widget.calendar;
 
     selectDateRange(widget);
-    widget.setSingleChoiceValue('bp-view', 'Garden', 'filters');
+    widget.setSingleChoiceValue('view', 'Garden', 'filters');
 
     widget.updateOptions({
       calendarOptions: {
         startDate: new Date('2030-02-01T00:00:00'),
         monthsToShow: 2,
       },
-      filters: [{ label: 'Scenery', type: 'select', key: 'bp-view', options: ['Ocean', 'Garden', 'City'] }],
+      filters: [{ label: 'Scenery', type: 'select', key: 'view', options: ['Ocean', 'Garden', 'City'] }],
     });
 
     expect(widget.calendar).not.toBe(originalCalendar);
     expect(widget.getValues().checkIn).toBe('2030-01-10');
     expect(widget.getValues().checkOut).toBe('2030-01-12');
     expect(widget.getValues().filters).toEqual({
-      'bp-view': 'Garden',
+      'view': 'Garden',
     });
 
     widget.destroy();
@@ -721,7 +818,7 @@ describe('BPSearchWidget', () => {
     });
 
     openFilters();
-    document.querySelector('[data-key="bp-view"]').click();
+    document.querySelector('[data-key="view"]').click();
     expect(document.querySelector('.bp-search-widget__popover')).not.toBeNull();
 
     document.querySelector('[data-role="filter-backdrop"]').click();
@@ -743,7 +840,7 @@ describe('BPSearchWidget', () => {
       filters: [{ label: 'Bedrooms', type: 'counter', min: 1, defaultValue: 2 }],
     });
 
-    document.querySelector('[data-key="bp-pets"]').click();
+    document.querySelector('[data-key="pets"]').click();
     expect(document.querySelector('.bp-calendar-tooltip')).not.toBeNull();
     openFilters();
 

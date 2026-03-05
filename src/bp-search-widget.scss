@@ -364,6 +364,12 @@
     box-sizing: border-box;
   }
 
+  .bp-search-widget__filter-panel--left-slide {
+    align-items: stretch;
+    justify-content: flex-start;
+    padding: 0;
+  }
+
   .bp-search-widget__filter-backdrop {
     position: absolute;
     inset: 0;
@@ -373,11 +379,23 @@
     cursor: pointer;
   }
 
-  .bp-search-widget__filter-backdrop:hover,
-  .bp-search-widget__filter-backdrop:focus,
-  .bp-search-widget__filter-backdrop:focus-visible,
-  .bp-search-widget__filter-backdrop:active {
+  .bp-search-widget__filter-backdrop--left-slide {
+    background: rgba(17, 17, 17, 0.3);
+    cursor: default;
+  }
+
+  .bp-search-widget__filter-backdrop:not(.bp-search-widget__filter-backdrop--left-slide):hover,
+  .bp-search-widget__filter-backdrop:not(.bp-search-widget__filter-backdrop--left-slide):focus,
+  .bp-search-widget__filter-backdrop:not(.bp-search-widget__filter-backdrop--left-slide):focus-visible,
+  .bp-search-widget__filter-backdrop:not(.bp-search-widget__filter-backdrop--left-slide):active {
     background: rgba(17, 17, 17, 0.38);
+  }
+
+  .bp-search-widget__filter-backdrop--left-slide:hover,
+  .bp-search-widget__filter-backdrop--left-slide:focus,
+  .bp-search-widget__filter-backdrop--left-slide:focus-visible,
+  .bp-search-widget__filter-backdrop--left-slide:active {
+    background: rgba(17, 17, 17, 0.3);
   }
 
   .bp-search-widget__filter-dialog {
@@ -395,6 +413,17 @@
     box-shadow: 0 34px 80px -42px rgba(0, 0, 0, 0.55);
     overflow: visible;
     box-sizing: border-box;
+  }
+
+  .bp-search-widget__filter-dialog--left-slide {
+    width: min(420px, calc(100vw - 48px));
+    max-height: 100vh;
+    height: 100vh;
+    border-radius: 0;
+    border: 0;
+    border-right: 1px solid #e5e5e5;
+    box-shadow: 26px 0 48px -34px rgba(0, 0, 0, 0.5);
+    animation: bp-search-widget-filter-slide-in 0.26s ease;
   }
 
   .bp-search-widget__filter-header {
@@ -474,19 +503,77 @@
     background: #000000;
   }
 
-  .bp-search-widget__filter-layout {
+  .bp-search-widget__filter-layout-wrap {
+    position: relative;
     flex: 1 1 auto;
+    min-height: 0;
+    padding-right: 28px;
+  }
+
+  .bp-search-widget__filter-layout {
+    height: 100%;
     display: flex;
     flex-direction: column;
     gap: 12px;
     min-height: 0;
     overflow: auto;
+    padding-right: 4px;
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .bp-search-widget__filter-layout::-webkit-scrollbar {
+    width: 0;
+    height: 0;
+    display: none;
+  }
+
+  .bp-search-widget__filter-scrollbar {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 16px;
+    padding: 3px;
+    border-radius: 999px;
+    background: #e5e7eb;
+    border: 1px solid #d4d4d8;
+    box-sizing: border-box;
+    pointer-events: none;
+    opacity: 1;
+    transition: opacity 0.2s ease;
+  }
+
+  .bp-search-widget__filter-scrollbar.is-hidden {
+    opacity: 0;
+  }
+
+  .bp-search-widget__filter-scrollbar-thumb {
+    width: 100%;
+    height: 64px;
+    border-radius: 999px;
+    background: #9ca3af;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.45);
+    transform: translateY(0);
+    transition: transform 0.08s linear;
+  }
+
+  .bp-search-widget__filter-scrollbar-thumb:hover {
+    background: #8b94a3;
+  }
+
+  .bp-search-widget__filter-layout--stacked {
+    gap: 0;
   }
 
   .bp-search-widget__filter-row {
     display: flex;
     align-items: stretch;
     gap: 0;
+  }
+
+  .bp-search-widget__filter-row--stacked {
+    display: block;
   }
 
   .bp-search-widget__filter-card {
@@ -499,6 +586,26 @@
     max-width: var(--bp-filter-width, 100%);
     padding: 10px 16px 14px;
     box-sizing: border-box;
+  }
+
+  .bp-search-widget__filter-row--stacked .bp-search-widget__filter-card {
+    flex: 1 1 100%;
+    max-width: 100%;
+    padding: 16px 8px 16px 0;
+    border-bottom: 1px solid rgba(17, 17, 17, 0.08);
+  }
+
+  .bp-search-widget__filter-row--stacked .bp-search-widget__filter-card::after {
+    display: none;
+  }
+
+  .bp-search-widget__filter-row--stacked:first-child .bp-search-widget__filter-card {
+    padding-top: 0;
+  }
+
+  .bp-search-widget__filter-row--stacked:last-child .bp-search-widget__filter-card {
+    border-bottom: 0;
+    padding-bottom: 0;
   }
 
   .bp-search-widget__filter-card::after {
@@ -691,6 +798,16 @@
 
   .bp-search-widget__section--dates .bp-calendar-clear:hover {
     background: #0f172a;
+  }
+
+  @keyframes bp-search-widget-filter-slide-in {
+    from {
+      transform: translateX(-100%);
+    }
+
+    to {
+      transform: translateX(0);
+    }
   }
 }
 

@@ -8,7 +8,6 @@
       rel="icon"
       href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='32' fill='%23000'/%3E%3Cpath d='M20 28h24v4H20zm0 10h17v4H20zm0-20h24v4H20z' fill='white'/%3E%3C/svg%3E"
     />
-    <link rel="stylesheet" href="../dist/bp-search-widget.css" />
     <style>
       :root {
         color-scheme: light;
@@ -106,6 +105,7 @@
     <script type="module">
       import '@fortawesome/fontawesome-free/css/all.min.css';
       import '@braudypedrosa/bp-calendar/styles';
+      import '../src/bp-search-widget.scss';
       import { BPSearchWidget } from '../src/bp-search-widget.js';
 
       const output = document.querySelector('#demo-output');
@@ -115,12 +115,13 @@
       };
 
       const widget = new BPSearchWidget('#widget-demo', {
+        filterDisplayMode: 'left-slide',
         fields: [
           { label: 'Guests', type: 'select', options: ['1', '2', '3', '4+'], position: 'end', icon: 'fa-solid fa-users' },
           { label: 'Promo Code', type: 'input', position: 'start', icon: 'fa-solid fa-ticket' },
         ],
         filters: [
-          { label: 'Bedrooms', type: 'counter', min: 1, max: 8, defaultValue: 2, width: '30%' },
+          { label: 'Bedrooms', key: 'bedrooms', type: 'counter', min: 1, max: 8, defaultValue: 2, width: '30%' },
           { label: 'View', type: 'select', options: ['Ocean', 'Garden', 'City'], width: '30%' },
           { label: 'Amenities', type: 'checkbox', options: ['Pool', 'Spa', 'Gym'] },
           { label: 'Property Type', type: 'radio', options: ['Villa', 'Cabin', 'Suite'] },
